@@ -75,8 +75,7 @@ int main( int argc, char **argv) {
 		exit(EXIT_FAILURE);
 	}
 
-	/* TODO: Connect the socket to the specified server. You have to pass correct parameters to the connect function.*/
-	if (connect() < 0) {
+	if (connect(sd, (struct sockaddr*)&sad, sizeof(sad)) < 0) {
 		fprintf(stderr,"connect failed\n");
 		exit(EXIT_FAILURE);
 	}
