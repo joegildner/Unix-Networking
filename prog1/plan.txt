@@ -1,9 +1,9 @@
-1.	We'll be creating a game of hangman between a server and a client.............................
+1.	We'll be creating a game of hangman between a server and a client. We will be using standard C networking libraries to implement a server and a client. We will implement hangman itself on the server side.
 
-2.	We anticipate that  ___ will be the most challenging part of this assignment, because
+2.	We anticipate that handling all possible test cases and errors will be the most challenging part of this assignment.
 
 3.	a) StackOverflow
 	b) The textbook
-	c)...............
+	c)	Lecture slides
 
-4.	We'll be meeting at 1-2pm M/T/W/F, and 
+4.	We'll be meeting at 1-2pm M/T/W/F, and Saturday at 4pm. After that, we'll make miscellaneous plans until its finished.
