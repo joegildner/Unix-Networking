@@ -1,0 +1,9 @@
+1.	We'll be creating a game of hangman between a server and a client.............................
+
+2.	We anticipate that  ___ will be the most challenging part of this assignment, because
+
+3.	a) StackOverflow
+	b) The textbook
+	c)...............
+
+4.	We'll be meeting at 1-2pm M/T/W/F, and 
