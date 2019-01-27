@@ -6,8 +6,9 @@
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <stdbool.h>
 
-int verify(char guess, char* secretword);
+void verify(char guess, char* secretword, char* progress, int* guesses);
 
 int main( int argc, char **argv) {
 	char* secretword;
@@ -29,33 +30,32 @@ int main( int argc, char **argv) {
 	
 	char guess;
 
-	while(guesses>=0){
+	while(guesses>0){
 		printf("Board: %s (%d guesses left)\n", progress, guesses);
 		printf("Enter guess: ");
 		scanf(" %c", &guess);
-		
-		printf("%c\n", guess);
-
-		int index = verify(guess, secretword);
-		if(index != -1){
-			progress[index] = guess;
-		}else{
-			printf("wrong");
+		verify(guess, secretword, progress, &guesses);
+		if(!strcmp(secretword,progress)){
+			printf("You Win!\n");
+			exit(0);
 		}
-		
-		if(
-
 	}
+
+	printf("You lose! cry about it, idiot.\n");
+	exit(0);
 }
 
-int verify(char guess, char* secretword){
-
+void verify(char guess, char* secretword, char* progress, int* guesses){
+	bool right = false;
 	for(int i=0; i<strlen(secretword);i++){
 		if(guess==secretword[i]){
-			return i;
+			progress[i] = guess;
+			right = true;
 		}
 	}
-	return -1;
+
+	if(!right){
+		printf("wrong\n");
+		(*guesses)--;
+	}
 }
-
-
