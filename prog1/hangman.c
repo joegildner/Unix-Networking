@@ -26,20 +26,24 @@ int main( int argc, char **argv) {
 		progress[i] = '_';
 		progress[i+1] = '\0';
 	}
+	
+	char guess;
 
 	while(guesses>=0){
 		printf("Board: %s (%d guesses left)\n", progress, guesses);
 		printf("Enter guess: ");
-		char guess = getchar();
-
-		int index = verify(guess, secretword);
-		if(index != -1){
-			progress[index] = guess;
-		}else{
-			printf("wrong");
-		}
-		fflush(stdin);
-		//update progress
+		scanf(" %c", &guess);
+		
+		printf("%c\n", guess);
+//
+//		int index = verify(guess, secretword);
+//		if(index != -1){
+//			progress[index] = guess;
+//		}else{
+//			printf("wrong");
+//		}
+//		fflush(stdin);
+//		//update progress
 	}
 }
 
@@ -56,11 +60,3 @@ int verify(char guess, char* secretword){
 }
 
 
-char guess(char* secretword){
-
-
-	//error check input(more than 1 char submitted)
-	//check if input is in secret word
-	//update progress if yes
-	//nothing if no
-}
