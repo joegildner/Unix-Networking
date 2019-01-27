@@ -35,28 +35,27 @@ int main( int argc, char **argv) {
 		scanf(" %c", &guess);
 		
 		printf("%c\n", guess);
-//
-//		int index = verify(guess, secretword);
-//		if(index != -1){
-//			progress[index] = guess;
-//		}else{
-//			printf("wrong");
-//		}
-//		fflush(stdin);
-//		//update progress
+
+		int index = verify(guess, secretword);
+		if(index != -1){
+			progress[index] = guess;
+		}else{
+			printf("wrong");
+		}
+		
+		if(
+
 	}
 }
 
 int verify(char guess, char* secretword){
-	char* c = strchr(secretword, guess);
-	if(c != NULL){
-		char* first = &secretword[0];
-		int index = (c - first) / sizeof(char);
-		return index;
+
+	for(int i=0; i<strlen(secretword);i++){
+		if(guess==secretword[i]){
+			return i;
+		}
 	}
-	else{
-		return -1;
-	}
+	return -1;
 }
 
 
