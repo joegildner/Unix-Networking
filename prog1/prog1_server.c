@@ -13,6 +13,7 @@
 int visits = 0; 
 
 int main(int argc, char **argv) {
+
 	struct protoent *ptrp; 
 	struct sockaddr_in sad; 
 	struct sockaddr_in cad; 
@@ -30,9 +31,7 @@ int main(int argc, char **argv) {
 	}
 
 	memset((char *)&sad,0,sizeof(sad));
-
-	sad.sin_family = AF_INET;
-	
+	sad.sin_family = AF_INET;	
 	sad.sin_addr.s_addr = INADDR_ANY;   
      
 	port = atoi(argv[1]); 
@@ -42,7 +41,6 @@ int main(int argc, char **argv) {
 		fprintf(stderr,"Error: Bad port number %s\n",argv[1]);
 		exit(EXIT_FAILURE);
 	}
-
 	
 	if ( ((long int)(ptrp = getprotobyname("tcp"))) == 0) {
 		fprintf(stderr, "Error: Cannot map \"tcp\" to protocol number");
@@ -54,7 +52,6 @@ int main(int argc, char **argv) {
 		fprintf(stderr, "Error: Socket creation failed\n");
 		exit(EXIT_FAILURE);
 	}
-
 	
 	if( setsockopt(sd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval)) < 0 ) {
 		fprintf(stderr, "Error Setting socket option failed\n");
@@ -71,14 +68,15 @@ int main(int argc, char **argv) {
 		exit(EXIT_FAILURE);
 	}
 
+/*================== END CONNECTION INIT ========================*/
+
 		while (1) {
 		alen = sizeof(cad);
 		if ( (sd2=accept(sd, (struct sockaddr *)&cad, &alen)) < 0) {
 			fprintf(stderr, "Error: Accept failed\n");
 			exit(EXIT_FAILURE);
 		}
-		visits++;
-		sprintf(buf,"This server has been contacted %d time%s\n",visits,visits==1?".":"s.");
+		
 		send(sd2,buf,strlen(buf),0);
 		close(sd2);
 	}
