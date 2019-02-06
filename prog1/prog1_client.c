@@ -12,6 +12,7 @@
 void playHangman(int sd);
 int recvGuesses(int sd);
 void recvBoard(int sd, char* buf);
+void guess(int sd);
 
 int main( int argc, char **argv) {
 	struct hostent *ptrh; 
@@ -72,12 +73,14 @@ int main( int argc, char **argv) {
 
 	playHangman(sd);
 	close(sd);
-
 	exit(EXIT_SUCCESS);
 }
 
 
 
+/*
+ *
+*/
 void playHangman(int sd){
 
 	int guesses;
@@ -89,10 +92,32 @@ void playHangman(int sd){
 		recvBoard(sd, &board[0]);		
 
 		printf("Board: %s (%d guesses left)\n", board, guesses);
-		break;
+
+		guess(sd);
+
+		break;//here for debug only
 	}
 }
 
+
+/*
+ *
+*/
+void guess(int sd){
+	char inputBuf[256];
+
+	printf("Enter guess: ");
+
+	if (fgets(inputBuf, sizeof(inputBuf), stdin) == NULL) {
+		printf("Exiting.\n");
+		exit(1);
+	}
+	char guess = inputBuf[0];
+
+	//send guess
+	if(send(sd, &guess, sizeof(guess),0)<=0){exit(1);}
+	printf("%c\n", guess);
+}
 
 
 

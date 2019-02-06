@@ -124,7 +124,8 @@ int startGame(int sd, char* secretword) {
 	//TODO: change so it's sending uint8_t's (so much easier with 16's)
 
 	uint16_t outputBuf;
-	char inputBuf[256];
+	char inputBuf[256];//idk if this will even be used
+	char guessBuf;
 	int guesses = strlen(secretword);
 	char board[guesses];
 
@@ -135,16 +136,20 @@ int startGame(int sd, char* secretword) {
 
 	while(guesses>0){
 
-		//send guesses (if the client wins, send 255 instead)
+		/*send guesses (if the client wins, send 255 instead)*/
 		outputBuf = htons(guesses);
 		if(send(sd, &outputBuf, sizeof(outputBuf),0)<=0){exit(1);}
 
-		//send board
+		/*send board*/
 		if(send(sd, &board, sizeof(board),0)<=0){exit(1);}
-		break;
-/*
-		await a guess 
+		break;//here for debug only
 
+		//receive the guess
+		if(recv(sd, &guessBuf, sizeof(guessBuf), 0)<=0) {exit(1);} 
+		
+		printf("%c\n", guessBuf);
+
+/*
 		verifyAndUpdate(guess, secretword, board, &guesses);
 
 		if(!strcmp(secretword,board)){
