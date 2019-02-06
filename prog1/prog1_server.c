@@ -1,5 +1,3 @@
-/* demo_server.c - code for example server program that uses TCP */
-
 #include <sys/types.h> 
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -10,11 +8,10 @@
 #include <unistd.h>
 #include <stdbool.h>
 
-void verifyAndUpdate(char guess, char* secretword, char* progress, int* guesses);
-int startGame(char* secretword); 
+void verifyAndUpdate(char guess, char* secretword, char* board, int* guesses);
+int startGame(int sd, char* secretword); 
 
 #define QLEN 6 
-int visits = 0; 
 
 int main(int argc, char **argv) {
 
@@ -25,7 +22,7 @@ int main(int argc, char **argv) {
 	int port; 
 	int alen; 
 	int optval = 1; 
-	char buf[1000]; 
+	char buf[256]; 
 
 	char* secretword = argv[2];
 
@@ -74,9 +71,12 @@ int main(int argc, char **argv) {
 		exit(EXIT_FAILURE);
 	}
 
-/*================== END CONNECTION-INIT ========================*/
+/*================== END CONNECTION-SETUP ========================*/
 
+
+	//main server loop
 	while (1) {
+
 		alen = sizeof(cad);
 		if ( (sd2=accept(sd, (struct sockaddr *)&cad, &alen)) < 0) {
 			fprintf(stderr, "Error: Accept failed\n");
@@ -95,7 +95,7 @@ int main(int argc, char **argv) {
 			//child
 			case 0: {
 				close(sd);
-				startGame(secretword);
+				startGame(sd2, secretword);
 		  		exit(0);
 		 		break;
 			}
@@ -108,7 +108,6 @@ int main(int argc, char **argv) {
 		}
 	}
 
-//send(sd2,buf,strlen(buf),0);
 
 }//end main
 
@@ -120,51 +119,60 @@ int main(int argc, char **argv) {
  *
  *	secretWord: user-input string that the client tries to guess
 */
-int startGame(char* secretword) {
+int startGame(int sd, char* secretword) {
+	
+	//TODO: change so it's sending uint8_t's (so much easier with 16's)
+
+	uint16_t outputBuf;
 	char inputBuf[256];
 	int guesses = strlen(secretword);
-	char* progress = malloc(sizeof(char) * guesses);
+	char board[guesses];
 
 	for(int i=0; i<strlen(secretword); i++){
-		progress[i] = '_';
-		progress[i+1] = '\0';
+		board[i] = '_';
+		board[i+1] = '\0';
 	}
 
-/*
 	while(guesses>0){
 
-		send guesses and progress
+		//send guesses (if the client wins, send 255 instead)
+		outputBuf = htons(guesses);
+		if(send(sd, &outputBuf, sizeof(outputBuf),0)<=0){exit(1);}
 
+		//send board
+		if(send(sd, &board, sizeof(board),0)<=0){exit(1);}
+		break;
+/*
 		await a guess 
 
-		verifyAndUpdate(guess, secretword, progress, &guesses);
+		verifyAndUpdate(guess, secretword, board, &guesses);
 
-		if(!strcmp(secretword,progress)){
+		if(!strcmp(secretword,board)){
 			send uint8_t 255
 		}
+*/
 	}
 	
-	send uint8_t 0
-*/
+	//send uint8_t 0
 }
 
 
 
 /* verify
- *	-checks if guess is in secretword, and updates progress 
+ *	-checks if guess is in secretword, and updates board 
  *	 and guesses accordingly
  * 
  * guess: client-input character
  * secretword: server-input string
- * progress: the "board" of underscores and letters
+ * board: the "board" of underscores and letters
  * guesses: number of guesses a player has left.
 */
-void verifyAndUpdate(char guess, char* secretword, char* progress, int* guesses){
+void verifyAndUpdate(char guess, char* secretword, char* board, int* guesses){
 	bool correct = false;
 
 	for(int i=0; i<strlen(secretword);i++){
 		if(guess==secretword[i]){
-			progress[i] = guess;
+			board[i] = guess;
 			correct = true;
 		}
 	}
