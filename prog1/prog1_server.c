@@ -9,7 +9,7 @@
 #include <stdbool.h>
 
 void verifyAndUpdate(char guess, char* secretword, char* board, int* guesses);
-int startGame(int sd, char* secretword); 
+void startGame(int sd, char* secretword); 
 
 #define QLEN 6 
 
@@ -119,7 +119,7 @@ int main(int argc, char **argv) {
  *
  *	secretWord: user-input string that the client tries to guess
 */
-int startGame(int sd, char* secretword) {
+void startGame(int sd, char* secretword) {
 	
 	//TODO: change so it's sending uint8_t's (so much easier with 16's)
 
@@ -149,16 +149,16 @@ int startGame(int sd, char* secretword) {
 		
 		printf("%c\n", guessBuf);
 
-/*
 		verifyAndUpdate(guess, secretword, board, &guesses);
 
+/*
 		if(!strcmp(secretword,board)){
-			send uint8_t 255
+			send a 255 next loop around for winning
 		}
 */
 	}
 	
-	//send uint8_t 0
+	//send a 0 for losing
 }
 
 
