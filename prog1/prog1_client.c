@@ -11,21 +11,21 @@
 
 void playHangman(int sd);
 int recvGuesses(int sd);
-void recvBoard(int sd, char* buf);
+void recvBoard(int sd, const int size, int remain);
 void guess(int sd);
 
 int main( int argc, char **argv) {
-	struct hostent *ptrh; 
-	struct protoent *ptrp; 
-	struct sockaddr_in sad; 
-	int sd; 
-	int port; 
-	char *host; 
-	int n; 
-	char buf[256]; 
+	struct hostent *ptrh;
+	struct protoent *ptrp;
+	struct sockaddr_in sad;
+	int sd;
+	int port;
+	char *host;
+	int n;
+	char buf[256];
 
-	memset((char *)&sad,0,sizeof(sad)); 
-	sad.sin_family = AF_INET; 
+	memset((char *)&sad,0,sizeof(sad));
+	sad.sin_family = AF_INET;
 
 	if( argc != 3 ) {
 		fprintf(stderr,"Error: Wrong number of arguments\n");
@@ -34,17 +34,17 @@ int main( int argc, char **argv) {
 		exit(EXIT_FAILURE);
 	}
 
-	port = atoi(argv[2]); 
-	if (port > 0) 
+	port = atoi(argv[2]);
+	if (port > 0)
 		sad.sin_port = htons((u_short)port);
 	else {
 		fprintf(stderr,"Error: bad port number %s\n",argv[2]);
 		exit(EXIT_FAILURE);
 	}
 
-	host = argv[1]; 
+	host = argv[1];
 
-	
+
 	ptrh = gethostbyname(host);
 	if ( ptrh == NULL ) {
 		fprintf(stderr,"Error: Invalid host: %s\n", host);
@@ -85,17 +85,18 @@ void playHangman(int sd){
 
 	int guesses;
 	char board[256];
-	
+	for(int i=0; i<256; i++){
+		board[i] = '\0';
+	}
+
+	int totalguesses = recvGuesses(sd);
+	recvBoard(sd, totalguesses, totalguesses);
+	guess(sd);
+
 	while(1){
-		
 		guesses = recvGuesses(sd);
-		recvBoard(sd, &board[0]);		
-
-		printf("Board: %s (%d guesses left)\n", board, guesses);
-
+		recvBoard(sd, totalguesses, guesses);
 		guess(sd);
-
-		break;//here for debug only
 	}
 }
 
@@ -115,8 +116,11 @@ void guess(int sd){
 	char guess = inputBuf[0];
 
 	//send guess
-	if(send(sd, &guess, sizeof(guess),0)<=0){exit(1);}
-	printf("%c\n", guess);
+	if(send(sd, &guess, sizeof(guess),0)<0){
+		perror("send");
+		exit(1);
+	}
+
 }
 
 
@@ -132,9 +136,12 @@ int recvGuesses(int sd){
 
 	uint16_t intBuf;
 
-	if(recv(sd, &intBuf, sizeof(intBuf), 0)<=0) {exit(1);}
+	if(recv(sd, &intBuf, sizeof(intBuf), MSG_WAITALL)<0) {
+		perror("recv");
+		exit(1);
+	}
 	int guesses = ntohs(intBuf);
-		
+
 	if(guesses==0){
 		printf("%s\n", "You Lost");
 		close(sd);
@@ -146,23 +153,19 @@ int recvGuesses(int sd){
 		close(sd);
 		exit(0);
 	}
-	
+
 	return guesses;
 }
 
 
 
-void recvBoard(int sd, char* buf){
+void recvBoard(int sd, const int totalGuesses, int remainGuesses){
+	char board[totalGuesses+1];
+	for(int i=0; i<=totalGuesses; i++) board[i] = '\0';
 
-	int endOfString = 0;
+	int n = recv(sd, board, (sizeof(char) * totalGuesses), MSG_WAITALL);
 
-	int n = recv(sd, buf, sizeof(buf), 0);
-	while (n > 0) {
-		endOfString += n;
-		n = recv(sd, buf, sizeof(buf), 0);
-	}
-	buf[endOfString] = '\0';
-	//printf("%s\n", buf);
+	printf("Board: %s (%d guesses left)\n", board, remainGuesses);
 }
 
 
