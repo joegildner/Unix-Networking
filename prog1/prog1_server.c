@@ -1,3 +1,5 @@
+//Joseph Gildner and Quentin Jensen
+
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -12,7 +14,7 @@
 void verifyAndUpdate(char guess, char* secretword, char* board, int* guesses);
 void startGame(int sd, char* secretword);
 
-#define QLEN 1
+#define QLEN 6
 
 int main(int argc, char **argv) {
 
@@ -74,7 +76,6 @@ int main(int argc, char **argv) {
 
 	signal(SIGCHLD,SIG_IGN);
 
-/*================== END CONNECTION-SETUP ========================*/
 
 
 	//main server loop
@@ -110,9 +111,7 @@ int main(int argc, char **argv) {
 			}
 		}
 	}
-
-
-}//end main
+}
 
 
 
@@ -124,10 +123,9 @@ int main(int argc, char **argv) {
 */
 void startGame(int sd, char* secretword) {
 
-	//TODO: change so it's sending uint8_t's (so much easier with 16's)
 
 	uint8_t outputBuf;
-	char inputBuf[256];//idk if this will even be used
+	char inputBuf[256];
 	char guessBuf;
 	int guesses = strlen(secretword);
 	char board[guesses];
@@ -139,13 +137,10 @@ void startGame(int sd, char* secretword) {
 
 	while(guesses>=0){
 
-		/*send guesses (if the client wins, send 255 instead)*/
 		outputBuf = guesses;
 		if(send(sd, &outputBuf, sizeof(uint8_t),0)<=0){exit(1);}
 
-		/*send board*/
 		if(send(sd, &board, sizeof(board),0)<=0){exit(1);}
-		//here for debug only
 
 		fdatasync(sd);
 
@@ -158,14 +153,13 @@ void startGame(int sd, char* secretword) {
 		printf("%d\n", guesses);
 
 		verifyAndUpdate(guessBuf, secretword, board, &guesses);
+
 		if(!strcmp(secretword,board)){
 			uint8_t win = 255;
 			if(send(sd, &win, sizeof(uint8_t),0)<=0){exit(1);};
 			break;
 		}
 	}
-
-	//send a 0 for losing
 }
 
 
@@ -190,7 +184,6 @@ void verifyAndUpdate(char guess, char* secretword, char* board, int* guesses){
 	}
 
 	if(!correct){
-//		printf("wrong\n");
 		(*guesses)--;
 	}
 }
