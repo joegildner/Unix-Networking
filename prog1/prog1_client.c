@@ -1,11 +1,11 @@
 // Quentin Jensen and Joseph Gildner
-// 
+// CSCI 367
+// 02/06/2019
 
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
-
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -17,6 +17,10 @@ int recvGuesses(int sd);
 void recvBoard(int sd, const int size, int remain);
 void guess(int sd);
 
+/* Main entrypoint,
+* The majority of the main method is code to set up the connection with the server
+* once established, the game code immediately begins execution
+*/
 int main( int argc, char **argv) {
 	struct hostent *ptrh;
 	struct protoent *ptrp;
@@ -72,17 +76,15 @@ int main( int argc, char **argv) {
 		exit(EXIT_FAILURE);
 	}
 
-//==== actual logic starts here ====================
+//==== actual game starts here ====================
 
 	playHangman(sd);
 	close(sd);
 	exit(EXIT_SUCCESS);
 }
 
-
-
-/*
- *
+/*playHangman
+ *Play hangman runs the game of hangman with the data received from the server
 */
 void playHangman(int sd){
 
@@ -92,10 +94,12 @@ void playHangman(int sd){
 		board[i] = '\0';
 	}
 
+	//Initialize board with the first turn
 	int totalguesses = recvGuesses(sd);
 	recvBoard(sd, totalguesses, totalguesses);
 	guess(sd);
 
+	//main game loop, exits once the server sends 255 guess signal
 	while(1){
 		guesses = recvGuesses(sd);
 		recvBoard(sd, totalguesses, guesses);
@@ -104,7 +108,7 @@ void playHangman(int sd){
 }
 
 
-/*
+/*obtain character guess from stdin from the user
  *
 */
 void guess(int sd){
@@ -118,7 +122,7 @@ void guess(int sd){
 	}
 	char guess = inputBuf[0];
 
-	//send guess
+	//send guess to server
 	if(send(sd, &guess, sizeof(char),0)<0){
 		perror("send");
 		exit(1);
@@ -137,7 +141,7 @@ int recvGuesses(int sd){
 
 	uint8_t intBuf;
 
-	if(recv(sd, &intBuf, sizeof(intBuf), MSG_WAITALL)<0) {
+	if(recv(sd, &intBuf, sizeof(uint8_t), MSG_WAITALL)<0) {
 		perror("recv");
 		exit(1);
 	}
@@ -159,7 +163,9 @@ int recvGuesses(int sd){
 }
 
 
-
+/* get the current game board from the server, with the
+* letters that have been correctly guessed filled in!
+*/
 void recvBoard(int sd, const int totalGuesses, int remainGuesses){
 	char board[totalGuesses+1];
 	for(int i=0; i<=totalGuesses; i++) board[i] = '\0';
