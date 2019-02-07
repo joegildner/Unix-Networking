@@ -1,0 +1,4 @@
+1. Joseph Gildner and Quentin Jensen
+2. Our tests did not reveal any errors in our code, it appears to be working entirely as expected.
+3. We ran our server with a variety of secret words, and for each word we attempted as many different combinations of user inputs as we could come up with. Every time we got to a win or lose state as expected, and the server had no issue handling multiple clients.
+4. The hardest part of this assignment was sending and receiving the data in the correct format to keep both the client and server running as intended asynchronously. It was also difficult to research exactly how to configure our network commands.

@@ -1,3 +1,6 @@
+// Quentin Jensen and Joseph Gildner
+// 
+
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -116,7 +119,7 @@ void guess(int sd){
 	char guess = inputBuf[0];
 
 	//send guess
-	if(send(sd, &guess, sizeof(guess),0)<0){
+	if(send(sd, &guess, sizeof(char),0)<0){
 		perror("send");
 		exit(1);
 	}
@@ -132,15 +135,13 @@ void guess(int sd){
 */
 int recvGuesses(int sd){
 
-	//TODO: change so it's receiving uint8_t's
-
-	uint16_t intBuf;
+	uint8_t intBuf;
 
 	if(recv(sd, &intBuf, sizeof(intBuf), MSG_WAITALL)<0) {
 		perror("recv");
 		exit(1);
 	}
-	int guesses = ntohs(intBuf);
+	int guesses = intBuf;
 
 	if(guesses==0){
 		printf("%s\n", "You Lost");
@@ -167,30 +168,3 @@ void recvBoard(int sd, const int totalGuesses, int remainGuesses){
 
 	printf("Board: %s (%d guesses left)\n", board, remainGuesses);
 }
-
-
-
-
-
-/* reference *
-	n = recv(sd, buf, sizeof(buf), 0);
-	while (n > 0) {
-		write(1,buf,n);
-		n = recv(sd, buf, sizeof(buf), 0);
-	}
-
-
-
-
-
-	uint8_t guess;
-	//if(recv(sd, guess, sizeof(uint8_t), 0)<=0) {exit(1);}
-
-	char buffer[1000];
-	if(recv(sd,guess,sizeof(buffer),0)<=0){exit(1);}
-
-	close(sd);
-
-
-
-*/
