@@ -12,31 +12,44 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 
-void playHangman(int);
-int recvGuesses(int);
-void recvBoard(int, const int, int);
-void guess(int);
-int initClient(int, char**);
+typedef struct initClientStruct{
+	int init_sd;
+	char init_player;
+	uint8_t init_boardSize;
+	uint8_t init_sec;
+} initClientStruct;
+
+//int recvGuesses(int);
+//void recvBoard(int, const int, int);
+//void guess(int);
+void mainGameLoop(int, char, uint8_t, uint8_t);
+initClientStruct initClient(int, char**);
 
 
 /* main
  */
 int main( int argc, char **argv) {
 
-	int sd = initClient(argc, argv); 
+	initClientStruct c = initClient(argc, argv); 
 
-	playHangman(sd);
-	close(sd);
+	mainGameLoop(c.init_sd, c.init_player, c.init_boardSize, c.init_sec);
+
+	close(c.init_sd);
 	exit(EXIT_SUCCESS);
 
 }
 
 
 
+void mainGameLoop(int sd, char player, uint8_t boardSize, uint8_t sec){
+	
+}
+
+
 /* play hangman
  * handles the main game logic on the client side, and receives
  * incoming info from the server
-*/
+*
 void playHangman(int sd){
 
 	int guesses;
@@ -57,9 +70,9 @@ void playHangman(int sd){
 }
 
 
-/*	guess
+	guess
  * gets user input, sends it to the server
-*/
+
 void guess(int sd){
 	char inputBuf[256];
 
@@ -81,11 +94,11 @@ void guess(int sd){
 
 
 
-/* receive guesses
+ receive guesses
  * 	handles the game-state message the server sends.
  *		if 0 or 255, receives and prints the board one last time,
  *		then closes the socket, then exits.
-*/
+
 int recvGuesses(int sd){
 
 	uint8_t intBuf;
@@ -112,9 +125,9 @@ int recvGuesses(int sd){
 }
 
 
-/* receive board
+ receive board
  * receives the current board from the server
- */
+ 
 void recvBoard(int sd, const int totalGuesses, int remainGuesses){
 	char board[totalGuesses+1];
 	for(int i=0; i<=totalGuesses; i++) board[i] = '\0';
@@ -123,25 +136,14 @@ void recvBoard(int sd, const int totalGuesses, int remainGuesses){
 
 	printf("Board: %s (%d guesses left)\n", board, remainGuesses);
 }
-
+*/
 
 
 /* initialize client
  * handles the many procedures of initializing the client
  * so it can talk to a server
  */
-int initClient(int argc, char** argv){
-
-	struct hostent *ptrh;
-	struct protoent *ptrp;
-	struct sockaddr_in sad;
-	int sd;
-	int port;
-	char *host;
-	int n;
-
-	memset((char *)&sad,0,sizeof(sad));
-	sad.sin_family = AF_INET;
+initClientStruct initClient(int argc, char** argv){
 
 	if( argc != 3 ) {
 		fprintf(stderr,"Error: Wrong number of arguments\n");
@@ -150,7 +152,19 @@ int initClient(int argc, char** argv){
 		exit(EXIT_FAILURE);
 	}
 
-	port = atoi(argv[2]);
+
+	struct hostent *ptrh;
+	struct protoent *ptrp;
+	struct sockaddr_in sad;
+	int sd;
+	
+	int port = atoi(argv[2]);
+	char* host = argv[1];
+
+
+	memset((char *)&sad,0,sizeof(sad));
+	sad.sin_family = AF_INET;
+
 	if (port > 0)
 		sad.sin_port = htons((u_short)port);
 	else {
@@ -158,7 +172,6 @@ int initClient(int argc, char** argv){
 		exit(EXIT_FAILURE);
 	}
 
-	host = argv[1];
 
 
 	ptrh = gethostbyname(host);
@@ -184,8 +197,31 @@ int initClient(int argc, char** argv){
 		fprintf(stderr,"connect failed\n");
 		exit(EXIT_FAILURE);
 	}
-	
-	return sd;
+
+	char player;
+	if(recv(sd, &player, sizeof(player), MSG_WAITALL)){
+		perror("recv");
+		exit(1);
+	}
+
+	uint8_t boardSize;
+	if(recv(sd, &boardSize, sizeof(boardSize), MSG_WAITALL)){
+		perror("recv");
+		exit(1);
+	}
+
+	uint8_t sec;
+	if(recv(sd, &sec, sizeof(sec), MSG_WAITALL)){
+		perror("recv");
+		exit(1);
+	}
+
+	initClientStruct c = { 	.init_sd = sd, 
+			  						.init_player = player, 
+			  						.init_boardSize = boardSize,
+									.init_sec = sec};
+
+	return c;
 
 }
 

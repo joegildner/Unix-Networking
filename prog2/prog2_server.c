@@ -11,48 +11,48 @@
 #include <stdbool.h>
 #include <signal.h>
 
-typedef struct initStruct {
+typedef struct initServerStruct {
 	struct sockaddr_in init_cad;
 	int init_sd;
 	int  init_sd2;
-	char* init_secretword;
-} initStruct;
+	uint8_t init_boardSize;
+	uint8_t init_sec;
+} initServerStruct;
 
-void verifyAndUpdate(char, char*, char*, int*);
-void startGame(int, char*);
-initStruct initServer(int, char**); 
-void mainServerLoop(struct sockaddr_in, int, int, char*);
+void startGameSession(int, int, uint8_t, uint8_t);
+initServerStruct initServer(int, char**); 
+void mainServerLoop(struct sockaddr_in, int, int, uint8_t, uint8_t);
 
 #define QLEN 6
+
 
 
 /* main
  */
 int main(int argc, char **argv) {
 
-	initStruct c = initServer(argc, argv); 
-		struct sockaddr_in cad 	= c.init_cad;
-		int sd 						= c.init_sd;
-		int sd2 						= c.init_sd2;
-		char* secretword 			= c.init_secretword;
+	initServerStruct c = initServer(argc, argv); 
 
-	signal(SIGCHLD,SIG_IGN);
-
-	mainServerLoop(cad, sd, sd2, secretword);
+	mainServerLoop(c.init_cad, c.init_sd, c.init_sd2, c.init_boardSize, c.init_sec);
 
 	exit(EXIT_SUCCESS);
 }
 
 
+
 /* main server loop
  * accepts an incoming connection, then forks. child plays the game, 
- * parent returns to accepting more connections
+ * parent returns to accept more connections
  */
-void mainServerLoop(struct sockaddr_in cad, int sd, int sd2, char* secretword){
+void mainServerLoop(struct sockaddr_in cad, int sd, int sd2, uint8_t boardSize, uint8_t sec){
 		
+	int player = 0;
+	//player = (player+1)%2 ???
+	//how can the different threads know which player they are?
+
 	while (1) {
 
-		int alen = sizeof(cad);
+		socklen_t alen = sizeof(cad);
 		if ( (sd2=accept(sd, (struct sockaddr *)&cad, &alen)) < 0) {
 			fprintf(stderr, "Error: Accept failed\n");
 			exit(EXIT_FAILURE);
@@ -70,7 +70,13 @@ void mainServerLoop(struct sockaddr_in cad, int sd, int sd2, char* secretword){
 			//child
 			case 0: {
 				close(sd);
-				startGame(sd2, secretword);
+
+				//if player=0, block until signal is heard
+				//if player=1, signal so both clients start the game simultaneously
+				//this way, both players are connecting to the same socket before it's closed
+				
+				startGameSession(sd2, player+1, boardSize, sec);
+
 		  		exit(0);
 		 		break;
 			}
@@ -86,13 +92,80 @@ void mainServerLoop(struct sockaddr_in cad, int sd, int sd2, char* secretword){
 
 
 
+
+void startGameSession(int sd, int player, uint8_t boardSize, uint8_t sec){
+
+	char c = player + '0';//fun trick for 0-9
+
+	if(send(sd, &c, sizeof(char),0)<=0){exit(1);}
+	if(send(sd, &boardSize, sizeof(uint8_t),0)<=0){exit(1);}
+	if(send(sd, &sec, sizeof(uint8_t),0)<=0){exit(1);}
+
+
+	//TODO: asynchronously receive a signal that the other player won 
+	
+	uint8_t round = 0;
+	uint8_t score = 0;
+	while(score<3){
+		
+		//send score
+		//send round number
+		//char board[boardSize] = generateBoard(boardSize);//no null byte
+		//send board
+
+		//TODO: figure out how to tell a client its their turn
+
+		//if round is odd, player 1 takes turn first. Afterward, block until player 2 finishes turn.
+		//Likewise, player 2 blocks until player 1 finishes turn.
+	
+		//send 'Y' if its this players turn
+		//else send 'N'
+	  
+		if(round%2==1 && player==1){
+			//takeTurn()
+			//block send N
+		}
+		else if(round%2==1 && player==2){
+			//block send N
+			//takeTurn()
+		}
+		else if(round%2==0 && player==1){
+			//block send N
+			//takeTurn()
+		}
+		else{
+			//takeTurn()
+			//block send N
+		}
+	
+	}
+
+	//send signal that this client won
+
+}
+
+//NOTE TO FUTURE ME: START WORKING HERE TOMORROW GOOD WORK BUDDY
+void takeTurn(int sd, uint8_t sec){
+	//send Y
+
+}
+
+
+
+char[] generateBoard(uint8_t boardSize){
+	//no null byte
+}
+
+
+
+
 /*	startGame
  * -server-side logic of the game
  * -server can run multiple instances of this game for multiple clients
  *
  *	secretWord: user-input string that the client tries to guess
 */
-void startGame(int sd, char* secretword) {
+/*void startGame(int sd, char* secretword) {
 
 
 	uint8_t outputBuf;
@@ -135,7 +208,7 @@ void startGame(int sd, char* secretword) {
 
 
 
-/* verify
+ verify
  *	-checks if guess is in secretword, and updates board
  *	 and guesses accordingly
  *
@@ -143,7 +216,7 @@ void startGame(int sd, char* secretword) {
  * secretword: server-input string
  * board: the "board" of underscores and letters
  * guesses: number of guesses a player has left.
-*/
+
 void verifyAndUpdate(char guess, char* secretword, char* board, int* guesses){
 	bool correct = false;
 
@@ -158,7 +231,7 @@ void verifyAndUpdate(char guess, char* secretword, char* board, int* guesses){
 		(*guesses)--;
 	}
 }
-
+*/
 
 
 /* initialize server
@@ -166,29 +239,32 @@ void verifyAndUpdate(char guess, char* secretword, char* board, int* guesses){
  * and returns a struct of everything the main game needs to know
  * about
  */
-initStruct initServer(int argc, char** argv){
+initServerStruct initServer(int argc, char** argv){
 	
-	struct protoent *ptrp;
-	struct sockaddr_in sad;
-	struct sockaddr_in cad;
-	int sd, sd2;
-	int port;
-	int optval = 1;
-
-	if( argc != 3 ) {
+	if( argc != 5 ) {
 		fprintf(stderr,"Error: Wrong number of arguments\n");
 		fprintf(stderr,"usage:\n");
 		fprintf(stderr,"./server server_port secretword\n");
 		exit(EXIT_FAILURE);
 	}
 
-	char* secretword = argv[2];
+	struct protoent *ptrp;
+	struct sockaddr_in sad;
+	struct sockaddr_in cad;
+	int sd = 0;
+	int sd2 = 0;
+	int optval = 1;
+
+	uint16_t port = atoi(argv[1]);
+	uint8_t boardSize = atoi(argv[2]);
+	uint8_t sec = atoi(argv[3]);
+	//char* pathToDict = argv[4];	
+
 
 	memset((char *)&sad,0,sizeof(sad));
 	sad.sin_family = AF_INET;
 	sad.sin_addr.s_addr = INADDR_ANY;
 
-	port = atoi(argv[1]);
 	if (port > 0) {
 		sad.sin_port = htons(port);
 	} else {
@@ -222,12 +298,15 @@ initStruct initServer(int argc, char** argv){
 		exit(EXIT_FAILURE);
 	}
 
+	initServerStruct c =	{ .init_cad = cad, 
+		.init_sd = sd,
+		.init_sd2 = sd2,
+		.init_boardSize = boardSize,
+		.init_sec = sec
+	};	
 
-	initStruct c =	{ .init_cad = cad, 
-			  				.init_sd = sd,
-							.init_sd2 = sd2,
-							.init_secretword = secretword
-						};	
+	signal(SIGCHLD,SIG_IGN);
+
 	return c;
 }
 
