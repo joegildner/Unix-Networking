@@ -1,5 +1,5 @@
 make:	
-	gcc -Wall -g -o server prog2_server.c
+	gcc -Wall -g -o server prog2_server.c trie.c
 	gcc -Wall -g -o client prog2_client.c
 
 #default run for debugging the server quick

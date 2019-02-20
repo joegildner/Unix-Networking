@@ -50,6 +50,8 @@ void mainServerLoop(struct sockaddr_in cad, int sd, int sd2, uint8_t boardSize, 
 	//player = (player+1)%2 ???
 	//how can the different threads know which player they are?
 
+	//TODO: how to have 2 players enter the same game session?
+
 	while (1) {
 
 		socklen_t alen = sizeof(cad);
@@ -71,6 +73,7 @@ void mainServerLoop(struct sockaddr_in cad, int sd, int sd2, uint8_t boardSize, 
 			case 0: {
 				close(sd);
 
+				//i don't think this is how it works?
 				//if player=0, block until signal is heard
 				//if player=1, signal so both clients start the game simultaneously
 				//this way, both players are connecting to the same socket before it's closed
@@ -120,9 +123,12 @@ void startGameSession(int sd, int player, uint8_t boardSize, uint8_t sec){
 	
 		//send 'Y' if its this players turn
 		//else send 'N'
-	  
+
+		//NOTE: this isn't right. as long as both players guess correctly
+		//a round should go on forever
+
 		if(round%2==1 && player==1){
-			//takeTurn()
+			takeTurn();
 			//block send N
 		}
 		else if(round%2==1 && player==2){
@@ -144,13 +150,39 @@ void startGameSession(int sd, int player, uint8_t boardSize, uint8_t sec){
 
 }
 
-//NOTE TO FUTURE ME: START WORKING HERE TOMORROW GOOD WORK BUDDY
-void takeTurn(int sd, uint8_t sec){
+//return true if the turn was successful (active player gets a point)
+//return false if the turn was a fail (inactive player gets a point)
+int takeTurn(int sd, char[] board, uint8_t sec){
+	char* usedWords[];
 	//send Y
+	//start timer
+	//	while timer is active
+	//		recv word from client
+	//
+	//		if(validateWord(word, board, usedWord){
+	//			send a uint8_t 1 to active player
+	//			send board size to inactive player
+	//			send board to inactive player
+	//			return true;
+	//		}
+	//		else{
+	//			break;
+	//		}
+	//	}
+	//	return false;
 
 }
 
 
+//not sure if char** for usedWords is right
+int validateWord(char word[], char board[], char* usedWords[]){
+	//check if word is in the dictionary
+	//check that this word hasn't been used this round
+	//check if that every letter in word corresponds to a letter in board
+	//		^kinda like hangman
+
+	//return true if valid
+}
 
 char[] generateBoard(uint8_t boardSize){
 	//no null byte
