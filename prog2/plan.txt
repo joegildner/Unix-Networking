@@ -1,0 +1,15 @@
+1.	We'll be creating a game of hangman between a server and a client. We will be
+	 using standard C networking libraries to implement a server and a client. We 
+	will implement hangman itself on the server side.
+
+2.	We anticipate that getting the clients to talk to each other through the 
+	server will be the most challenging part.
+
+3.	a) StackOverflow
+	b) The textbook
+	c)	Lecture slides
+
+4. due to other class projects having sooner due dates, this project is on the 
+	backburner until those are complete. As soon as we're both free, OR 
+	the Tuesday before hits, we'll work on it maniacally until it's complete.
+
