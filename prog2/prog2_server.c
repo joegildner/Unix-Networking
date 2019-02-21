@@ -14,14 +14,14 @@
 typedef struct initServerStruct {
 	struct sockaddr_in init_cad;
 	int init_sd;
-	int  init_sd2;
 	uint8_t init_boardSize;
 	uint8_t init_sec;
 } initServerStruct;
 
 void startGameSession(int, int, uint8_t, uint8_t);
-initServerStruct initServer(int, char**); 
-void mainServerLoop(struct sockaddr_in, int, int, uint8_t, uint8_t);
+initServerStruct initServer(int, char**);
+void mainServerLoop(struct sockaddr_in, int, uint8_t, uint8_t);
+int takeTurn(int sd, char board[], uint8_t sec);
 
 #define QLEN 6
 
@@ -31,9 +31,9 @@ void mainServerLoop(struct sockaddr_in, int, int, uint8_t, uint8_t);
  */
 int main(int argc, char **argv) {
 
-	initServerStruct c = initServer(argc, argv); 
+	initServerStruct c = initServer(argc, argv);
 
-	mainServerLoop(c.init_cad, c.init_sd, c.init_sd2, c.init_boardSize, c.init_sec);
+	mainServerLoop(c.init_cad, c.init_sd, c.init_boardSize, c.init_sec);
 
 	exit(EXIT_SUCCESS);
 }
@@ -41,16 +41,18 @@ int main(int argc, char **argv) {
 
 
 /* main server loop
- * accepts an incoming connection, then forks. child plays the game, 
+ * accepts an incoming connection, then forks. child plays the game,
  * parent returns to accept more connections
  */
-void mainServerLoop(struct sockaddr_in cad, int sd, int sd2, uint8_t boardSize, uint8_t sec){
-		
-	int player = 0;
+void mainServerLoop(struct sockaddr_in cad, int sd, uint8_t boardSize, uint8_t sec){
+
+	//int player = 0;
 	//player = (player+1)%2 ???
 	//how can the different threads know which player they are?
 
 	//TODO: how to have 2 players enter the same game session?
+	int sd2;
+	int sd3;
 
 	while (1) {
 
@@ -59,6 +61,12 @@ void mainServerLoop(struct sockaddr_in cad, int sd, int sd2, uint8_t boardSize, 
 			fprintf(stderr, "Error: Accept failed\n");
 			exit(EXIT_FAILURE);
 		}
+		printf("Client 1 connected, waiting for Client 2...\n");
+		if ( (sd3=accept(sd, (struct sockaddr *)&cad, &alen)) < 0) {
+			fprintf(stderr, "Error: Accept failed\n");
+			exit(EXIT_FAILURE);
+		}
+		printf("Client 2 connected, Game Starting...\n");
 
 		const pid_t cpid = fork();
 		switch(cpid) {
@@ -77,8 +85,9 @@ void mainServerLoop(struct sockaddr_in cad, int sd, int sd2, uint8_t boardSize, 
 				//if player=0, block until signal is heard
 				//if player=1, signal so both clients start the game simultaneously
 				//this way, both players are connecting to the same socket before it's closed
-				
-				startGameSession(sd2, player+1, boardSize, sec);
+
+				startGameSession(sd2, sd3, boardSize, sec);
+				printf("HELLO?");
 
 		  		exit(0);
 		 		break;
@@ -87,6 +96,7 @@ void mainServerLoop(struct sockaddr_in cad, int sd, int sd2, uint8_t boardSize, 
 			//parent
 			default: {
 				close(sd2);
+				close(sd3);
 		  		break;
 			}
 		}
@@ -96,7 +106,7 @@ void mainServerLoop(struct sockaddr_in cad, int sd, int sd2, uint8_t boardSize, 
 
 
 
-void startGameSession(int sd, int player, uint8_t boardSize, uint8_t sec){
+void startGameSession(int p1, int p2, uint8_t boardSize, uint8_t sec){
 
 	char c = player + '0';//fun trick for 0-9
 
@@ -105,12 +115,12 @@ void startGameSession(int sd, int player, uint8_t boardSize, uint8_t sec){
 	if(send(sd, &sec, sizeof(uint8_t),0)<=0){exit(1);}
 
 
-	//TODO: asynchronously receive a signal that the other player won 
-	
+	//TODO: asynchronously receive a signal that the other player won
+
 	uint8_t round = 0;
 	uint8_t score = 0;
 	while(score<3){
-		
+
 		//send score
 		//send round number
 		//char board[boardSize] = generateBoard(boardSize);//no null byte
@@ -120,7 +130,7 @@ void startGameSession(int sd, int player, uint8_t boardSize, uint8_t sec){
 
 		//if round is odd, player 1 takes turn first. Afterward, block until player 2 finishes turn.
 		//Likewise, player 2 blocks until player 1 finishes turn.
-	
+
 		//send 'Y' if its this players turn
 		//else send 'N'
 
@@ -128,7 +138,7 @@ void startGameSession(int sd, int player, uint8_t boardSize, uint8_t sec){
 		//a round should go on forever
 
 		if(round%2==1 && player==1){
-			takeTurn();
+			//takeTurn();
 			//block send N
 		}
 		else if(round%2==1 && player==2){
@@ -143,7 +153,7 @@ void startGameSession(int sd, int player, uint8_t boardSize, uint8_t sec){
 			//takeTurn()
 			//block send N
 		}
-	
+
 	}
 
 	//send signal that this client won
@@ -152,8 +162,8 @@ void startGameSession(int sd, int player, uint8_t boardSize, uint8_t sec){
 
 //return true if the turn was successful (active player gets a point)
 //return false if the turn was a fail (inactive player gets a point)
-int takeTurn(int sd, char[] board, uint8_t sec){
-	char* usedWords[];
+int takeTurn(int sd, char board[], uint8_t sec){
+	//char** usedWords;
 	//send Y
 	//start timer
 	//	while timer is active
@@ -170,7 +180,7 @@ int takeTurn(int sd, char[] board, uint8_t sec){
 	//		}
 	//	}
 	//	return false;
-
+	return 0;
 }
 
 
@@ -182,11 +192,14 @@ int validateWord(char word[], char board[], char* usedWords[]){
 	//		^kinda like hangman
 
 	//return true if valid
+	return 0;
 }
 
+/*
 char[] generateBoard(uint8_t boardSize){
 	//no null byte
 }
+*/
 
 
 
@@ -272,7 +285,7 @@ void verifyAndUpdate(char guess, char* secretword, char* board, int* guesses){
  * about
  */
 initServerStruct initServer(int argc, char** argv){
-	
+
 	if( argc != 5 ) {
 		fprintf(stderr,"Error: Wrong number of arguments\n");
 		fprintf(stderr,"usage:\n");
@@ -284,13 +297,12 @@ initServerStruct initServer(int argc, char** argv){
 	struct sockaddr_in sad;
 	struct sockaddr_in cad;
 	int sd = 0;
-	int sd2 = 0;
 	int optval = 1;
 
 	uint16_t port = atoi(argv[1]);
 	uint8_t boardSize = atoi(argv[2]);
 	uint8_t sec = atoi(argv[3]);
-	//char* pathToDict = argv[4];	
+	//char* pathToDict = argv[4];
 
 
 	memset((char *)&sad,0,sizeof(sad));
@@ -330,21 +342,13 @@ initServerStruct initServer(int argc, char** argv){
 		exit(EXIT_FAILURE);
 	}
 
-	initServerStruct c =	{ .init_cad = cad, 
+	initServerStruct c =	{ .init_cad = cad,
 		.init_sd = sd,
-		.init_sd2 = sd2,
 		.init_boardSize = boardSize,
 		.init_sec = sec
-	};	
+	};
 
 	signal(SIGCHLD,SIG_IGN);
 
 	return c;
 }
-
-
-
-
-
-
-
