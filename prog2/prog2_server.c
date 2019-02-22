@@ -10,6 +10,7 @@
 #include <unistd.h>
 #include <stdbool.h>
 #include <signal.h>
+#include <sys/time.h>
 
 typedef struct initServerStruct {
 	struct sockaddr_in init_cad;
@@ -22,6 +23,7 @@ void startGameSession(int, int, uint8_t, uint8_t);
 initServerStruct initServer(int, char**);
 void mainServerLoop(struct sockaddr_in, int, uint8_t, uint8_t);
 int takeTurn(int sd, char board[], uint8_t sec);
+char* generateBoard(uint8_t boardSize);
 
 #define QLEN 6
 
@@ -108,23 +110,42 @@ void mainServerLoop(struct sockaddr_in cad, int sd, uint8_t boardSize, uint8_t s
 
 void startGameSession(int p1, int p2, uint8_t boardSize, uint8_t sec){
 
-	char c = player + '0';//fun trick for 0-9
+	char c1 = '1';
+	char c2 = '2';
 
-	if(send(sd, &c, sizeof(char),0)<=0){exit(1);}
-	if(send(sd, &boardSize, sizeof(uint8_t),0)<=0){exit(1);}
-	if(send(sd, &sec, sizeof(uint8_t),0)<=0){exit(1);}
+	if(send(p1, &c1, sizeof(char),0)<=0){exit(1);}
+	if(send(p1, &boardSize, sizeof(uint8_t),0)<=0){exit(1);}
+	if(send(p1, &sec, sizeof(uint8_t),0)<=0){exit(1);}
 
-
-	//TODO: asynchronously receive a signal that the other player won
+	if(send(p2, &c2, sizeof(char),0)<=0){exit(1);}
+	if(send(p2, &boardSize, sizeof(uint8_t),0)<=0){exit(1);}
+	if(send(p2, &sec, sizeof(uint8_t),0)<=0){exit(1);}
 
 	uint8_t round = 0;
-	uint8_t score = 0;
-	while(score<3){
+	uint8_t score1 = 0;
+	uint8_t score2 = 0;
 
-		//send score
-		//send round number
-		//char board[boardSize] = generateBoard(boardSize);//no null byte
+	char* board;
+
+	while(score1<3 || score2<3){
+
+		if(send(p1, &score1, sizeof(uint8_t),0)<=0){exit(1);}
+		if(send(p1, &score2, sizeof(uint8_t),0)<=0){exit(1);}
+
+		if(send(p2, &score1, sizeof(uint8_t),0)<=0){exit(1);}
+		if(send(p2, &score2, sizeof(uint8_t),0)<=0){exit(1);}
+
+		if(send(p1, &round, sizeof(uint8_t),0)<=0){exit(1);}
+		if(send(p2, &round, sizeof(uint8_t),0)<=0){exit(1);}
+
+		board = generateBoard(boardSize);//no null byte
+
+		if(send(p1, board, sizeof(char)*boardSize,0)<=0){exit(1);}
+		if(send(p2, board, sizeof(char)*boardSize,0)<=0){exit(1);}
+
 		//send board
+
+
 
 		//TODO: figure out how to tell a client its their turn
 
@@ -137,24 +158,30 @@ void startGameSession(int p1, int p2, uint8_t boardSize, uint8_t sec){
 		//NOTE: this isn't right. as long as both players guess correctly
 		//a round should go on forever
 
-		if(round%2==1 && player==1){
-			//takeTurn();
-			//block send N
-		}
-		else if(round%2==1 && player==2){
-			//block send N
-			//takeTurn()
-		}
-		else if(round%2==0 && player==1){
-			//block send N
-			//takeTurn()
-		}
-		else{
-			//takeTurn()
-			//block send N
-		}
+		// if(round%2==1 && player==1){
+		// 	//takeTurn();
+		// 	//block send N
+		// }
+		// else if(round%2==1 && player==2){
+		// 	//block send N
+		// 	//takeTurn()
+		// }
+		// else if(round%2==0 && player==1){
+		// 	//block send N
+		// 	//takeTurn()
+		// }
+		// else{
+		// 	//takeTurn()
+		// 	//block send N
+		// }
 
 	}
+
+	// Send scores to notify client someone won.
+	if(send(p1, &score1, sizeof(uint8_t),0)<=0){exit(1);}
+	if(send(p1, &score2, sizeof(uint8_t),0)<=0){exit(1);}
+	if(send(p2, &score1, sizeof(uint8_t),0)<=0){exit(1);}
+	if(send(p2, &score2, sizeof(uint8_t),0)<=0){exit(1);}
 
 	//send signal that this client won
 
@@ -195,11 +222,35 @@ int validateWord(char word[], char board[], char* usedWords[]){
 	return 0;
 }
 
-/*
-char[] generateBoard(uint8_t boardSize){
-	//no null byte
+
+char* generateBoard(uint8_t boardSize){
+	struct timeval nanotime;
+	gettimeofday(&nanotime, NULL);
+	char* board = malloc(sizeof(char)*boardSize);
+	srand(nanotime.tv_usec);
+
+	bool containsVowel = false;
+	char vowels[5] = {'a','e','i','o','u'};
+
+	for(int i=0; i<boardSize; i++){
+		char randChar = 'a' + (rand()%26);
+		for(int j=0; j<5; j++){
+			if(randChar == vowels[j]) containsVowel = true;
+		}
+		board[i] = randChar;
+	}
+
+	while(!containsVowel){
+		char randChar = 'a' + (rand()%26);
+		for(int i=0; i<5; i++){
+			if(randChar == vowels[i]) containsVowel = true;
+		}
+		board[boardSize-1] = randChar;
+	}
+
+	return board;
 }
-*/
+
 
 
 

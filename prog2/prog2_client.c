@@ -1,10 +1,11 @@
 // Quentin Jensen and Joseph Gildner
-// 
+//
 
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <stdbool.h>
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -30,7 +31,7 @@ initClientStruct initClient(int, char**);
  */
 int main( int argc, char **argv) {
 
-	initClientStruct c = initClient(argc, argv); 
+	initClientStruct c = initClient(argc, argv);
 
 	mainGameLoop(c.init_sd, c.init_player, c.init_boardSize, c.init_sec);
 
@@ -41,8 +42,32 @@ int main( int argc, char **argv) {
 
 
 
-void mainGameLoop(int sd, char player, uint8_t boardSize, uint8_t sec){
-	
+void mainGameLoop(int sd, char pNum, uint8_t boardSize, uint8_t sec){
+	uint8_t score1;
+	uint8_t score2;
+	uint8_t round = 0;
+	char board[boardSize+1];
+
+
+	int loops =0;
+	while(loops<8){
+
+		if(recv(sd, &score1, sizeof(uint8_t), MSG_WAITALL)<0){exit(1);}
+		if(recv(sd, &score2, sizeof(uint8_t), MSG_WAITALL)<0){exit(1);}
+
+		printf("%d - %d\n", score1, score2);
+		int received;
+
+		if(recv(sd, &round, sizeof(uint8_t), MSG_WAITALL)<0){exit(1);}
+		received = recv(sd, board, sizeof(char)*boardSize, MSG_WAITALL);//<0){exit(1);}
+
+		printf("%s\n",board);
+		//printf("%s\n",board);
+
+		loops++;
+
+	}
+
 }
 
 
@@ -123,11 +148,12 @@ int recvGuesses(int sd){
 
 	return guesses;
 }
+06�
 
 
  receive board
  * receives the current board from the server
- 
+
 void recvBoard(int sd, const int totalGuesses, int remainGuesses){
 	char board[totalGuesses+1];
 	for(int i=0; i<=totalGuesses; i++) board[i] = '\0';
@@ -157,7 +183,7 @@ initClientStruct initClient(int argc, char** argv){
 	struct protoent *ptrp;
 	struct sockaddr_in sad;
 	int sd;
-	
+
 	int port = atoi(argv[2]);
 	char* host = argv[1];
 
@@ -199,30 +225,28 @@ initClientStruct initClient(int argc, char** argv){
 	}
 
 	char player;
-	if(recv(sd, &player, sizeof(player), MSG_WAITALL)){
+	if(recv(sd, &player, sizeof(player), MSG_WAITALL) == -1){
 		perror("recv");
 		exit(1);
 	}
 
 	uint8_t boardSize;
-	if(recv(sd, &boardSize, sizeof(boardSize), MSG_WAITALL)){
+	if(recv(sd, &boardSize, sizeof(boardSize), MSG_WAITALL) == -1){
 		perror("recv");
 		exit(1);
 	}
 
 	uint8_t sec;
-	if(recv(sd, &sec, sizeof(sec), MSG_WAITALL)){
+	if(recv(sd, &sec, sizeof(sec), MSG_WAITALL) == -1){
 		perror("recv");
 		exit(1);
 	}
 
-	initClientStruct c = { 	.init_sd = sd, 
-			  						.init_player = player, 
+	initClientStruct c = { 	.init_sd = sd,
+												.init_player = player,
 			  						.init_boardSize = boardSize,
 									.init_sec = sec};
 
 	return c;
 
 }
-
-
