@@ -43,16 +43,11 @@ int main(int argc, char **argv) {
 
 
 /* main server loop
- * accepts an incoming connection, then forks. child plays the game,
- * parent returns to accept more connections
+ * accepts 2 incoming connections at a time, then forks. child plays the game with
+ * those 2 clients, parent returns to accepting more connections
  */
 void mainServerLoop(struct sockaddr_in cad, int sd, uint8_t boardSize, uint8_t sec){
 
-	//int player = 0;
-	//player = (player+1)%2 ???
-	//how can the different threads know which player they are?
-
-	//TODO: how to have 2 players enter the same game session?
 	int sd2;
 	int sd3;
 
@@ -63,11 +58,14 @@ void mainServerLoop(struct sockaddr_in cad, int sd, uint8_t boardSize, uint8_t s
 			fprintf(stderr, "Error: Accept failed\n");
 			exit(EXIT_FAILURE);
 		}
+
 		printf("Client 1 connected, waiting for Client 2...\n");
+
 		if ( (sd3=accept(sd, (struct sockaddr *)&cad, &alen)) < 0) {
 			fprintf(stderr, "Error: Accept failed\n");
 			exit(EXIT_FAILURE);
 		}
+
 		printf("Client 2 connected, Game Starting...\n");
 
 		const pid_t cpid = fork();
@@ -82,15 +80,7 @@ void mainServerLoop(struct sockaddr_in cad, int sd, uint8_t boardSize, uint8_t s
 			//child
 			case 0: {
 				close(sd);
-
-				//i don't think this is how it works?
-				//if player=0, block until signal is heard
-				//if player=1, signal so both clients start the game simultaneously
-				//this way, both players are connecting to the same socket before it's closed
-
 				startGameSession(sd2, sd3, boardSize, sec);
-				printf("HELLO?");
-
 		  		exit(0);
 		 		break;
 			}
@@ -143,11 +133,6 @@ void startGameSession(int p1, int p2, uint8_t boardSize, uint8_t sec){
 		if(send(p1, board, sizeof(char)*boardSize,0)<=0){exit(1);}
 		if(send(p2, board, sizeof(char)*boardSize,0)<=0){exit(1);}
 
-		//send board
-
-
-
-		//TODO: figure out how to tell a client its their turn
 
 		//if round is odd, player 1 takes turn first. Afterward, block until player 2 finishes turn.
 		//Likewise, player 2 blocks until player 1 finishes turn.
@@ -158,22 +143,12 @@ void startGameSession(int p1, int p2, uint8_t boardSize, uint8_t sec){
 		//NOTE: this isn't right. as long as both players guess correctly
 		//a round should go on forever
 
-		// if(round%2==1 && player==1){
-		// 	//takeTurn();
-		// 	//block send N
-		// }
-		// else if(round%2==1 && player==2){
-		// 	//block send N
-		// 	//takeTurn()
-		// }
-		// else if(round%2==0 && player==1){
-		// 	//block send N
-		// 	//takeTurn()
-		// }
-		// else{
-		// 	//takeTurn()
-		// 	//block send N
-		// }
+		 if(round%2==1){
+		 			 
+		 }
+		 else{
+
+		 }
 
 	}
 
