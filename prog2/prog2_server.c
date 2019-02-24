@@ -11,6 +11,7 @@
 #include <stdbool.h>
 #include <signal.h>
 #include <sys/time.h>
+#include <errno.h>
 
 typedef struct initServerStruct {
 	struct sockaddr_in init_cad;
@@ -19,11 +20,14 @@ typedef struct initServerStruct {
 	uint8_t init_sec;
 } initServerStruct;
 
-void startGameSession(int, int, uint8_t, uint8_t);
+void startGameSession(int p1, int p2, uint8_t boardSize, uint8_t sec);
 initServerStruct initServer(int, char**);
 void mainServerLoop(struct sockaddr_in, int, uint8_t, uint8_t);
-int takeTurn(int sd, char board[], uint8_t sec);
 char* generateBoard(uint8_t boardSize);
+char* validateWord(char word[], char board[], char** usedWords);
+void takeTurns(int p1, int p2, uint8_t* score1, uint8_t* score2, 
+              char* board, uint8_t boardSize, uint8_t sec, uint8_t round);
+
 
 #define QLEN 6
 
@@ -43,30 +47,41 @@ int main(int argc, char **argv) {
 
 
 /* main server loop
- * accepts 2 incoming connections at a time, then forks. child plays the game with
- * those 2 clients, parent returns to accepting more connections
+ * accepts 2 incoming connections at a time, then forks. As soon as a client connects, 
+ * send them their player number, the size of the board, and the seconds of each
+ * round. The child then plays the game with those 2 clients. The parent returns 
+ * to accepting more connections
  */
 void mainServerLoop(struct sockaddr_in cad, int sd, uint8_t boardSize, uint8_t sec){
 
 	int sd2;
 	int sd3;
+	char c1 = '1';
+	char c2 = '2';
 
 	while (1) {
+
 
 		socklen_t alen = sizeof(cad);
 		if ( (sd2=accept(sd, (struct sockaddr *)&cad, &alen)) < 0) {
 			fprintf(stderr, "Error: Accept failed\n");
 			exit(EXIT_FAILURE);
 		}
-
+		if(send(sd2, &c1, sizeof(char),0)<=0){exit(1);}
+		if(send(sd2, &boardSize, sizeof(uint8_t),0)<=0){exit(1);}
+		if(send(sd2, &sec, sizeof(uint8_t),0)<=0){exit(1);}
 		printf("Client 1 connected, waiting for Client 2...\n");
+
 
 		if ( (sd3=accept(sd, (struct sockaddr *)&cad, &alen)) < 0) {
 			fprintf(stderr, "Error: Accept failed\n");
 			exit(EXIT_FAILURE);
-		}
-
+		}	
+		if(send(sd3, &c2, sizeof(char),0)<=0){exit(1);}
+		if(send(sd3, &boardSize, sizeof(uint8_t),0)<=0){exit(1);}
+		if(send(sd3, &sec, sizeof(uint8_t),0)<=0){exit(1);}
 		printf("Client 2 connected, Game Starting...\n");
+
 
 		const pid_t cpid = fork();
 		switch(cpid) {
@@ -97,28 +112,23 @@ void mainServerLoop(struct sockaddr_in cad, int sd, uint8_t boardSize, uint8_t s
 
 
 
-
+/* start game session
+ * each round consists of sending both player's both player's scores,
+ * and the round number. Then generate a new board, and send it to them.
+ *
+ */
 void startGameSession(int p1, int p2, uint8_t boardSize, uint8_t sec){
-
-	char c1 = '1';
-	char c2 = '2';
-
-	if(send(p1, &c1, sizeof(char),0)<=0){exit(1);}
-	if(send(p1, &boardSize, sizeof(uint8_t),0)<=0){exit(1);}
-	if(send(p1, &sec, sizeof(uint8_t),0)<=0){exit(1);}
-
-	if(send(p2, &c2, sizeof(char),0)<=0){exit(1);}
-	if(send(p2, &boardSize, sizeof(uint8_t),0)<=0){exit(1);}
-	if(send(p2, &sec, sizeof(uint8_t),0)<=0){exit(1);}
 
 	uint8_t round = 0;
 	uint8_t score1 = 0;
 	uint8_t score2 = 0;
 
 	char* board;
-
+	
+	//begin new round
 	while(score1<3 || score2<3){
-
+		round++;	
+	
 		if(send(p1, &score1, sizeof(uint8_t),0)<=0){exit(1);}
 		if(send(p1, &score2, sizeof(uint8_t),0)<=0){exit(1);}
 
@@ -133,23 +143,7 @@ void startGameSession(int p1, int p2, uint8_t boardSize, uint8_t sec){
 		if(send(p1, board, sizeof(char)*boardSize,0)<=0){exit(1);}
 		if(send(p2, board, sizeof(char)*boardSize,0)<=0){exit(1);}
 
-
-		//if round is odd, player 1 takes turn first. Afterward, block until player 2 finishes turn.
-		//Likewise, player 2 blocks until player 1 finishes turn.
-
-		//send 'Y' if its this players turn
-		//else send 'N'
-
-		//NOTE: this isn't right. as long as both players guess correctly
-		//a round should go on forever
-
-		 if(round%2==1){
-		 			 
-		 }
-		 else{
-
-		 }
-
+		takeTurns(p1, p2, &score1, &score2, board, boardSize, sec, round);
 	}
 
 	// Send scores to notify client someone won.
@@ -158,43 +152,113 @@ void startGameSession(int p1, int p2, uint8_t boardSize, uint8_t sec){
 	if(send(p2, &score1, sizeof(uint8_t),0)<=0){exit(1);}
 	if(send(p2, &score2, sizeof(uint8_t),0)<=0){exit(1);}
 
-	//send signal that this client won
-
-}
-
-//return true if the turn was successful (active player gets a point)
-//return false if the turn was a fail (inactive player gets a point)
-int takeTurn(int sd, char board[], uint8_t sec){
-	//char** usedWords;
-	//send Y
-	//start timer
-	//	while timer is active
-	//		recv word from client
-	//
-	//		if(validateWord(word, board, usedWord){
-	//			send a uint8_t 1 to active player
-	//			send board size to inactive player
-	//			send board to inactive player
-	//			return true;
-	//		}
-	//		else{
-	//			break;
-	//		}
-	//	}
-	//	return false;
-	return 0;
 }
 
 
-//not sure if char** for usedWords is right
-int validateWord(char word[], char board[], char* usedWords[]){
-	//check if word is in the dictionary
-	//check that this word hasn't been used this round
-	//check if that every letter in word corresponds to a letter in board
-	//		^kinda like hangman
 
-	//return true if valid
-	return 0;
+/* take turns
+ * each player takes turns guessing a word, on a timelimit set by
+ * setsockopt. server then validates the word. This session of turn ends
+ * as soon as a player times out, or submits an invalid word.
+ *
+ * NOTE: modifies the scores passed in
+ */
+void takeTurns(int p1, int p2, uint8_t* score1, uint8_t* score2, 
+              char* board, uint8_t boardSize, uint8_t sec, uint8_t round){
+
+	char** usedWords;
+	int activePlayer = 0;
+	int inactivePlayer = 0;
+	int recvValue = 0;
+	bool running = true;
+	uint8_t one = 1;
+	uint8_t zero = 0;
+	char y = 'Y';
+	char n = 'N';
+	uint8_t wordSize = 0;
+	char word[255];
+
+	struct timeval tv;
+	tv.tv_sec = sec; 
+	tv.tv_usec = 0;
+	//set active and inactive player
+	if(round%2==1){
+		activePlayer=p1;
+		inactivePlayer=p2;
+	}
+	else{
+		activePlayer=p2;
+		inactivePlayer=p1;
+	}
+
+	while(running){
+		
+		if(send(activePlayer, &y, sizeof(char),0)<=0){exit(1);}
+		if(send(inactivePlayer, &n, sizeof(char),0)<=0){exit(1);}
+
+	  	//set timer
+		setsockopt(activePlayer, SOL_SOCKET,SO_RCVTIMEO, &tv, sizeof(struct timeval));
+
+		//wait sec seconds for player to respond
+		recv(activePlayer, &wordSize, sizeof(uint8_t), MSG_WAITALL);
+		recvValue = recv(activePlayer, &word, sizeof(char)*wordSize, MSG_WAITALL);
+		
+		if( recvValue == -1 && errno == EAGAIN ) {
+			running = false;
+			printf("%s\n", "recv returned due to timeout!");
+		}
+	
+
+		//validate
+		char* validatedWord = validateWord(&word[0], board, usedWords);
+		if(strcmp(validatedWord, "") && running){
+			
+			//TODO: add validatedWord to usedWords
+
+			if(send(activePlayer, &one, sizeof(uint8_t),0)<=0){exit(1);}
+			if(send(inactivePlayer, &boardSize, sizeof(uint8_t),0)<=0){exit(1);}
+			if(send(inactivePlayer, board, sizeof(char)*boardSize,0)<=0){exit(1);}
+
+			if(activePlayer==p1){ score1++; }
+			else{ score2++; } 
+		}
+		else{
+			running = false;
+		}
+		
+
+		//switch players
+		int temp;
+		temp = activePlayer;
+		activePlayer = inactivePlayer;
+		inactivePlayer = temp;
+
+	}
+
+	//turn is over
+	if(send(activePlayer, &zero, sizeof(uint8_t),0)<=0){exit(1);}
+	if(send(inactivePlayer, &zero, sizeof(uint8_t),0)<=0){exit(1);}
+
+	if(inactivePlayer==p1){ score1++; }
+	else{ score2++; } 
+
+}
+
+
+
+/* validate word
+ * checks if the word is in the dictionary, and hasn't already
+ * been used this round. Then checks that every letter in word
+ * corresponds to a letter in board
+ */
+char* validateWord(char* word, char board[], char** usedWords){
+	bool isValid = false;
+
+	//twl06.txt
+	//do something with trie.c
+
+	if(isValid){return word;}
+	return "";
 }
 
 

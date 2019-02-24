@@ -56,10 +56,10 @@ void mainGameLoop(int sd, char pNum, uint8_t boardSize, uint8_t sec){
 		if(recv(sd, &score2, sizeof(uint8_t), MSG_WAITALL)<0){exit(1);}
 
 		printf("%d - %d\n", score1, score2);
-		int received;
+		/*int received = 0;*/
 
 		if(recv(sd, &round, sizeof(uint8_t), MSG_WAITALL)<0){exit(1);}
-		received = recv(sd, board, sizeof(char)*boardSize, MSG_WAITALL);//<0){exit(1);}
+		/*received = */recv(sd, board, sizeof(char)*boardSize, MSG_WAITALL);//<0){exit(1);}
 
 		printf("%s\n",board);
 		//printf("%s\n",board);

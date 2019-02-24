@@ -13,3 +13,4 @@ dc:
 clean:
 	rm server
 	rm client
+	rm core
