@@ -218,7 +218,6 @@ void takeTurns(int p1, int p2, uint8_t* score1, uint8_t* score2,
 		//wait sec seconds for player to respond
 		recv(activePlayer, &wordSize, sizeof(uint8_t), MSG_WAITALL);
 		recvValue = recv(activePlayer, &word, sizeof(char)*wordSize, MSG_WAITALL);
-		word[wordSize] = '\0';
 
 		if( recvValue == -1 && errno == EAGAIN ) {
 			running = false;
@@ -269,16 +268,15 @@ void takeTurns(int p1, int p2, uint8_t* score1, uint8_t* score2,
  * corresponds to a letter in board
  */
 bool validateWord(uint8_t wordsize, char* word, uint8_t boardsize, char board[], node* usedWords){
+	word[wordsize] = '\0';
+
 	//check if word is in dictionary
 	bool isValid = true;
-	printf("Valid1: %d\n",isValid);
 
-	char* def; //trie definition, not used
+	char* def = ""; //trie definition, not used
 	if(!dictionary_lookup(word, def)){
 		isValid = false;
 	}
-
-	printf("Valid2: %d\n",isValid);
 
 	//check if all letters are in board
 	for(int i=0; i<wordsize; i++){
@@ -292,15 +290,11 @@ bool validateWord(uint8_t wordsize, char* word, uint8_t boardsize, char board[],
 		if(!containsChar) isValid = false;
 	}
 
-	printf("Valid3: %d\n",isValid);
-
 	if(isValid) isValid = !contains(usedWords,word);
-
-	printf("Valid4: %d\n",isValid);
 
 	if(isValid) push(usedWords,word);
 
-	printf("Valid5: %d\n",isValid);
+	printf("validation is working");
 
 	return isValid;
 
@@ -335,82 +329,6 @@ char* generateBoard(uint8_t boardSize){
 }
 
 
-
-
-
-/*	startGame
- * -server-side logic of the game
- * -server can run multiple instances of this game for multiple clients
- *
- *	secretWord: user-input string that the client tries to guess
-*/
-/*void startGame(int sd, char* secretword) {
-
-
-	uint8_t outputBuf;
-	char inputBuf[256];
-	char guessBuf;
-	int guesses = strlen(secretword);
-	char board[guesses];
-
-	for(int i=0; i<strlen(secretword); i++){
-		board[i] = '_';
-		board[i+1] = '\0';
-	}
-
-	while(guesses>=0){
-
-		outputBuf = guesses;
-		if(send(sd, &outputBuf, sizeof(uint8_t),0)<=0){exit(1);}
-
-		if(send(sd, &board, sizeof(board),0)<=0){exit(1);}
-
-		fdatasync(sd);
-
-		//receive the guess
-		int received = 0;
-		while(received == 0){
-			received += recv(sd, &guessBuf, sizeof(guessBuf), MSG_WAITALL);
-		}
-
-		printf("%d\n", guesses);
-
-		verifyAndUpdate(guessBuf, secretword, board, &guesses);
-
-		if(!strcmp(secretword,board)){
-			uint8_t win = 255;
-			if(send(sd, &win, sizeof(uint8_t),0)<=0){exit(1);};
-			break;
-		}
-	}
-}
-
-
-
- verify
- *	-checks if guess is in secretword, and updates board
- *	 and guesses accordingly
- *
- * guess: client-input character
- * secretword: server-input string
- * board: the "board" of underscores and letters
- * guesses: number of guesses a player has left.
-
-void verifyAndUpdate(char guess, char* secretword, char* board, int* guesses){
-	bool correct = false;
-
-	for(int i=0; i<strlen(secretword);i++){
-		if(guess==secretword[i]){
-			board[i] = guess;
-			correct = true;
-		}
-	}
-
-	if(!correct){
-		(*guesses)--;
-	}
-}
-*/
 
 
 /* initialize server
@@ -488,13 +406,12 @@ initServerStruct initServer(int argc, char** argv){
 }
 
 bool contains(node* head, char* thisWord) {
-	printf("stuckhere?\n");
 	 bool containsWord = false;
+
 	 node* current = head;
 	 while (current != NULL) {
 			if(!strcmp(current->word,thisWord)) containsWord = true;
 			current = current->next;
-			printf("stuckhere?3\n");
 	 }
 	 return containsWord;
 }
