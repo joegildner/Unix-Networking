@@ -77,7 +77,6 @@ void playRound(int sd){
 		if(recv(sd, &isActive, sizeof(uint8_t), MSG_WAITALL)<0){
 			exit(1);
 		}
-		printf("%c\n", isActive);
 		if(isActive == 'Y')
 			roundIsRunning = takeTurn(sd);
 		else if(isActive == 'N')
@@ -116,13 +115,13 @@ bool takeTurn(int sd){
 		else{
 			printf("Invalid word!\n");
 		}
- 
+
 		return isValidWord;
 
 }
 
 bool waitTurn(int sd){
-	uint8_t wordSize;
+	uint8_t wordSize = 0;
 	char word[255];
 
 	printf("Please wait for opponent to enter word...\n");
@@ -132,6 +131,7 @@ bool waitTurn(int sd){
 		if(recv(sd, word, sizeof(char)*wordSize, MSG_WAITALL)<0){exit(1);}
 		word[wordSize] = '\0';
 		printf("Oppenent entered \"%s\"\n",word);
+		exit(0);
 		return 1;
 	}else{
 		return 0;

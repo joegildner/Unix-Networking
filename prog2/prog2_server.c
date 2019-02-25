@@ -22,13 +22,20 @@ typedef struct initServerStruct {
 	uint8_t init_sec;
 } initServerStruct;
 
+typedef struct node {
+	 char* word;
+	 struct node* next;
+} node;
+
+bool contains(node* head, char* thisWord);
+void push(node* head, char* word);
 void startGameSession(int p1, int p2, uint8_t boardSize, uint8_t sec);
 initServerStruct initServer(int, char**);
 void mainServerLoop(struct sockaddr_in, int, uint8_t, uint8_t);
 char* generateBoard(uint8_t boardSize);
-void takeTurns(int p1, int p2, uint8_t* score1, uint8_t* score2, 
+void takeTurns(int p1, int p2, uint8_t* score1, uint8_t* score2,
               char* board, uint8_t boardSize, uint8_t sec, uint8_t round);
-bool validateWord(uint8_t wordsize, char* word, uint8_t boardsize, char board[], char** usedWords);
+bool validateWord(uint8_t wordsize, char* word, uint8_t boardsize, char board[], node* usedWords);
 bool checkUsed(char**, char*);
 
 
@@ -49,9 +56,9 @@ int main(int argc, char **argv) {
 
 
 /* main server loop
- * accepts 2 incoming connections at a time, then forks. As soon as a client connects, 
+ * accepts 2 incoming connections at a time, then forks. As soon as a client connects,
  * send them their player number, the size of the board, and the seconds of each
- * round. The child then plays the game with those 2 clients. The parent returns 
+ * round. The child then plays the game with those 2 clients. The parent returns
  * to accepting more connections
  */
 void mainServerLoop(struct sockaddr_in cad, int sd, uint8_t boardSize, uint8_t sec){
@@ -78,7 +85,7 @@ void mainServerLoop(struct sockaddr_in cad, int sd, uint8_t boardSize, uint8_t s
 		if ( (sd3=accept(sd, (struct sockaddr *)&cad, &alen)) < 0) {
 			fprintf(stderr, "Error: Accept failed\n");
 			exit(EXIT_FAILURE);
-		}	
+		}
 		if(send(sd3, &c2, sizeof(char),0)<=0){exit(1);}
 		if(send(sd3, &boardSize, sizeof(uint8_t),0)<=0){exit(1);}
 		if(send(sd3, &sec, sizeof(uint8_t),0)<=0){exit(1);}
@@ -126,12 +133,10 @@ void startGameSession(int p1, int p2, uint8_t boardSize, uint8_t sec){
 	uint8_t score2 = 0;
 
 	char* board;
-	
+
 	//begin new round
 	while(score1<3 || score2<3){
-		round++;	
-	
-			printf("%s\n", "got here 1");
+		round++;
 
 		if(send(p1, &score1, sizeof(uint8_t),0)<=0){exit(1);}
 
@@ -172,13 +177,11 @@ void startGameSession(int p1, int p2, uint8_t boardSize, uint8_t sec){
  *
  * NOTE: modifies the scores passed in
  */
-void takeTurns(int p1, int p2, uint8_t* score1, uint8_t* score2, 
+void takeTurns(int p1, int p2, uint8_t* score1, uint8_t* score2,
               char* board, uint8_t boardSize, uint8_t sec, uint8_t round){
 
-	char* usedWords[255];
-	for(int i=0; i<255; i++){
-		usedWords[i] = NULL;
-	}
+	node* usedWords = malloc(sizeof(node));
+	usedWords->word = ""; //needed to initialize list
 
 	int activePlayer = 0;
 	int inactivePlayer = 0;
@@ -192,7 +195,7 @@ void takeTurns(int p1, int p2, uint8_t* score1, uint8_t* score2,
 	char word[255];
 
 	struct timeval tv;
-	tv.tv_sec = sec; 
+	tv.tv_sec = sec;
 	tv.tv_usec = 0;
 	//set active and inactive player
 	if(round%2==1){
@@ -215,29 +218,31 @@ void takeTurns(int p1, int p2, uint8_t* score1, uint8_t* score2,
 		//wait sec seconds for player to respond
 		recv(activePlayer, &wordSize, sizeof(uint8_t), MSG_WAITALL);
 		recvValue = recv(activePlayer, &word, sizeof(char)*wordSize, MSG_WAITALL);
+		word[wordSize] = '\0';
 
 		if( recvValue == -1 && errno == EAGAIN ) {
 			running = false;
 			printf("%s\n", "recv returned due to timeout!");
 		}
 		//TODO: if recvValue==0, disconnect both clients
-	
+
 
 		//validate
-		bool isValidWord = true;//validateWord(wordSize, &word[0], boardSize, board, usedWords);
+		bool isValidWord = validateWord(wordSize, &word[0], boardSize, board, usedWords);
 		if(isValidWord && running){
 			if(send(activePlayer, &one, sizeof(uint8_t),0)<=0){exit(1);}
+			printf("Wordsize: %d ...",wordSize);
 			if(send(inactivePlayer, &wordSize, sizeof(uint8_t),0)<=0){exit(1);}
-
+			printf("Sent!\n");
 			if(send(inactivePlayer, word, sizeof(char)*boardSize,0)<=0){exit(1);}
 
 			if(activePlayer==p1){ score1++; }
-			else{ score2++; } 
+			else{ score2++; }
 		}
 		else{
 			running = false;
 		}
-		
+
 
 		//switch players
 		int temp;
@@ -252,7 +257,7 @@ void takeTurns(int p1, int p2, uint8_t* score1, uint8_t* score2,
 	if(send(inactivePlayer, &zero, sizeof(uint8_t),0)<=0){exit(1);}
 
 	if(inactivePlayer==p1){ score1++; }
-	else{ score2++; } 
+	else{ score2++; }
 
 }
 
@@ -263,22 +268,21 @@ void takeTurns(int p1, int p2, uint8_t* score1, uint8_t* score2,
  * been used this round. Then checks that every letter in word
  * corresponds to a letter in board
  */
-bool validateWord(uint8_t wordsize, char* word, uint8_t boardsize, char board[], char** usedWords){
+bool validateWord(uint8_t wordsize, char* word, uint8_t boardsize, char board[], node* usedWords){
 	//check if word is in dictionary
-	return true;
-
 	bool isValid = true;
+	printf("Valid1: %d\n",isValid);
+
 	char* def; //trie definition, not used
-	printf("%d\n",wordsize);
 	if(!dictionary_lookup(word, def)){
 		isValid = false;
 	}
-	printf("LEAVING NOW");
+
+	printf("Valid2: %d\n",isValid);
 
 	//check if all letters are in board
 	for(int i=0; i<wordsize; i++){
 		bool containsChar = false;
-		printf("Reached 3\n");
 		for(int j=0; j<boardsize; j++){
 			if(word[i] == board[j]){
 				containsChar = true;
@@ -288,21 +292,18 @@ bool validateWord(uint8_t wordsize, char* word, uint8_t boardsize, char board[],
 		if(!containsChar) isValid = false;
 	}
 
-	if(isValid)
-		isValid = checkUsed(usedWords, word);
+	printf("Valid3: %d\n",isValid);
+
+	if(isValid) isValid = !contains(usedWords,word);
+
+	printf("Valid4: %d\n",isValid);
+
+	if(isValid) push(usedWords,word);
+
+	printf("Valid5: %d\n",isValid);
 
 	return isValid;
 
-}
-
-bool checkUsed(char** usedWords, char* word){
-	for(int i=0; i<sizeof(usedWords)/sizeof(char*); i++){
-		if(!strcmp(usedWords[i], word)){
-			return false;
-		}else if(usedWords[i] == NULL){
-		}
-	}
-	return true;
 }
 
 char* generateBoard(uint8_t boardSize){
@@ -484,4 +485,27 @@ initServerStruct initServer(int argc, char** argv){
 	signal(SIGCHLD,SIG_IGN);
 
 	return c;
+}
+
+bool contains(node* head, char* thisWord) {
+	printf("stuckhere?\n");
+	 bool containsWord = false;
+	 node* current = head;
+	 while (current != NULL) {
+			if(!strcmp(current->word,thisWord)) containsWord = true;
+			current = current->next;
+			printf("stuckhere?3\n");
+	 }
+	 return containsWord;
+}
+
+void push(node* head, char* word) {
+	 node* current = head;
+	 while (current->next != NULL) {
+		 current = current->next;
+	 }
+
+	 current->next = malloc(sizeof(node));
+	 current->next->word = word;
+	 current->next->next = NULL;
 }
