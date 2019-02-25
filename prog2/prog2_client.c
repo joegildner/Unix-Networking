@@ -121,12 +121,14 @@ bool takeTurn(int sd){
 }
 
 bool waitTurn(int sd){
-	uint8_t wordSize = 0;
+	uint8_t wordSize = 69;
 	char word[255];
 
 	printf("Please wait for opponent to enter word...\n");
 
 	if(recv(sd, &wordSize, sizeof(uint8_t), MSG_WAITALL)<0){exit(1);}
+	printf("%d\n", wordSize);
+	//exit(0);
 	if(wordSize > 0){
 		if(recv(sd, word, sizeof(char)*wordSize, MSG_WAITALL)<0){exit(1);}
 		word[wordSize] = '\0';

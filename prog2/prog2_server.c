@@ -152,7 +152,10 @@ void startGameSession(int p1, int p2, uint8_t boardSize, uint8_t sec){
 
 		board = generateBoard(boardSize);//no null byte
 
-		printf("%s\n", board);
+		char DEBUG_board[boardSize+1];
+		strcpy(DEBUG_board, board);
+		DEBUG_board[boardSize] = '\0';
+		printf("%s\n", DEBUG_board);
 
 		if(send(p1, board, sizeof(char)*boardSize,0)<=0){exit(1);}
 		if(send(p2, board, sizeof(char)*boardSize,0)<=0){exit(1);}
@@ -229,28 +232,31 @@ void takeTurns(int p1, int p2, uint8_t* score1, uint8_t* score2,
 		//validate
 		bool isValidWord = validateWord(wordSize, &word[0], boardSize, board, usedWords);
 		if(isValidWord && running){
+			printf("%s\n", "word was just validated" );
 			if(send(activePlayer, &one, sizeof(uint8_t),0)<=0){exit(1);}
-			printf("Wordsize: %d ...",wordSize);
 			if(send(inactivePlayer, &wordSize, sizeof(uint8_t),0)<=0){exit(1);}
-			printf("Sent!\n");
 			if(send(inactivePlayer, word, sizeof(char)*boardSize,0)<=0){exit(1);}
 
 			if(activePlayer==p1){ score1++; }
 			else{ score2++; }
 		}
-		else{
+		else{	
+			printf("%s\n","word was just invalidated" );
 			running = false;
 		}
 
-
+		printf("active is: %d\ninactive is: %d\n",activePlayer, inactivePlayer);
 		//switch players
 		int temp;
 		temp = activePlayer;
 		activePlayer = inactivePlayer;
 		inactivePlayer = temp;
+		printf("just switched\n");
+		printf("active is: %d\ninactive is: %d",activePlayer, inactivePlayer);
 
 	}
 
+	printf("turn is over\n");
 	//turn is over
 	if(send(activePlayer, &zero, sizeof(uint8_t),0)<=0){exit(1);}
 	if(send(inactivePlayer, &zero, sizeof(uint8_t),0)<=0){exit(1);}
@@ -293,8 +299,6 @@ bool validateWord(uint8_t wordsize, char* word, uint8_t boardsize, char board[],
 	if(isValid) isValid = !contains(usedWords,word);
 
 	if(isValid) push(usedWords,word);
-
-	printf("validation is working");
 
 	return isValid;
 
