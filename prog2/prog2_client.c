@@ -121,19 +121,17 @@ bool takeTurn(int sd){
 }
 
 bool waitTurn(int sd){
-	uint8_t wordSize = 69;
+	uint8_t wordSize = 0;
 	char word[255];
 
 	printf("Please wait for opponent to enter word...\n");
 
 	if(recv(sd, &wordSize, sizeof(uint8_t), MSG_WAITALL)<0){exit(1);}
 	printf("%d\n", wordSize);
-	//exit(0);
 	if(wordSize > 0){
 		if(recv(sd, word, sizeof(char)*wordSize, MSG_WAITALL)<0){exit(1);}
 		word[wordSize] = '\0';
 		printf("Oppenent entered \"%s\"\n",word);
-		exit(0);
 		return 1;
 	}else{
 		return 0;
@@ -142,100 +140,6 @@ bool waitTurn(int sd){
 }
 
 
-
-
-/* play hangman
- * handles the main game logic on the client side, and receives
- * incoming info from the server
-*
-void playHangman(int sd){
-
-	int guesses;
-	char board[256];
-	for(int i=0; i<256; i++){
-		board[i] = '\0';
-	}
-
-	int totalguesses = recvGuesses(sd);
-	recvBoard(sd, totalguesses, totalguesses);
-	guess(sd);
-
-	while(1){
-		guesses = recvGuesses(sd);
-		recvBoard(sd, totalguesses, guesses);
-		guess(sd);
-	}
-}
-
-
-	guess
- * gets user input, sends it to the server
-
-void guess(int sd){
-	char inputBuf[256];
-
-	printf("Enter guess: ");
-
-	if (fgets(inputBuf, sizeof(inputBuf), stdin) == NULL) {
-		printf("Exiting.\n");
-		exit(1);
-	}
-	char guess = inputBuf[0];
-
-	//send guess
-	if(send(sd, &guess, sizeof(char),0)<0){
-		perror("send");
-		exit(1);
-	}
-
-}
-
-
-
- receive guesses
- * 	handles the game-state message the server sends.
- *		if 0 or 255, receives and prints the board one last time,
- *		then closes the socket, then exits.
-
-int recvGuesses(int sd){
-
-	uint8_t intBuf;
-
-	if(recv(sd, &intBuf, sizeof(intBuf), MSG_WAITALL)<0) {
-		perror("recv");
-		exit(1);
-	}
-	int guesses = intBuf;
-
-	if(guesses==0){
-		printf("%s\n", "You Lost");
-		close(sd);
-		exit(0);
-	}
-
-	else if(guesses==255){
-		printf("%s\n", "You Win");
-		close(sd);
-		exit(0);
-	}
-
-	return guesses;
-}
-06�
-
-
- receive board
- * receives the current board from the server
-
-void recvBoard(int sd, const int totalGuesses, int remainGuesses){
-	char board[totalGuesses+1];
-	for(int i=0; i<=totalGuesses; i++) board[i] = '\0';
-
-	int n = recv(sd, board, (sizeof(char) * totalGuesses), MSG_WAITALL);
-
-	printf("Board: %s (%d guesses left)\n", board, remainGuesses);
-}
-*/
 
 
 /* initialize client

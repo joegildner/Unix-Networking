@@ -163,6 +163,8 @@ void startGameSession(int p1, int p2, uint8_t boardSize, uint8_t sec){
 		takeTurns(p1, p2, &score1, &score2, board, boardSize, sec, round);
 	}
 
+	printf("someone won\n");
+
 	// Send scores to notify client someone won.
 	if(send(p1, &score1, sizeof(uint8_t),0)<=0){exit(1);}
 	if(send(p1, &score2, sizeof(uint8_t),0)<=0){exit(1);}
@@ -232,18 +234,15 @@ void takeTurns(int p1, int p2, uint8_t* score1, uint8_t* score2,
 		//validate
 		bool isValidWord = true;//validateWord(wordSize, &word[0], boardSize, board, usedWords);
 		if(isValidWord && running){
-			printf("%s\n", "word was just validated" );
+
 			if(send(activePlayer, &one, sizeof(uint8_t),0)<=0){exit(1);}
 			if(send(inactivePlayer, &wordSize, sizeof(uint8_t),0)<=0){exit(1);}
-			printf("%d\n", wordSize);
 			if(send(inactivePlayer, word, sizeof(char)*boardSize,0)<=0){exit(1);}
-			printf("%s\n", word);
 
-			if(activePlayer==p1){ score1++; }
-			else{ score2++; }
+			if(activePlayer==p1){ (*score1)++; }
+			else{ (*score2)++; }
 		}
 		else{	
-			printf("%s\n","word was just invalidated" );
 			running = false;
 		}
 
@@ -260,8 +259,8 @@ void takeTurns(int p1, int p2, uint8_t* score1, uint8_t* score2,
 	if(send(activePlayer, &zero, sizeof(uint8_t),0)<=0){exit(1);}
 	if(send(inactivePlayer, &zero, sizeof(uint8_t),0)<=0){exit(1);}
 
-	if(inactivePlayer==p1){ score1++; }
-	else{ score2++; }
+	if(inactivePlayer==p1){ (*score1)++; }
+	else{ (*score2)++; }
 
 }
 
