@@ -1,2 +1,1 @@
-implement trie.c
-
+make sure both clients disconnect if one disconnects unexpectedly

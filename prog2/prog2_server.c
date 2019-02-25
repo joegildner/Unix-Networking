@@ -12,6 +12,8 @@
 #include <signal.h>
 #include <sys/time.h>
 #include <errno.h>
+#include "trie.h"
+#define QLEN 6
 
 typedef struct initServerStruct {
 	struct sockaddr_in init_cad;
@@ -24,18 +26,18 @@ void startGameSession(int p1, int p2, uint8_t boardSize, uint8_t sec);
 initServerStruct initServer(int, char**);
 void mainServerLoop(struct sockaddr_in, int, uint8_t, uint8_t);
 char* generateBoard(uint8_t boardSize);
-char* validateWord(char word[], char board[], char** usedWords);
 void takeTurns(int p1, int p2, uint8_t* score1, uint8_t* score2, 
               char* board, uint8_t boardSize, uint8_t sec, uint8_t round);
-
-
-#define QLEN 6
-
+bool validateWord(uint8_t wordsize, char* word, uint8_t boardsize, char board[], char** usedWords);
+bool checkUsed(char**, char*);
 
 
 /* main
  */
 int main(int argc, char **argv) {
+
+	dictionary_initialise();
+    dictionary_read_from_file(argv[4]);
 
 	initServerStruct c = initServer(argc, argv);
 
@@ -129,16 +131,23 @@ void startGameSession(int p1, int p2, uint8_t boardSize, uint8_t sec){
 	while(score1<3 || score2<3){
 		round++;	
 	
+			printf("%s\n", "got here 1");
+
 		if(send(p1, &score1, sizeof(uint8_t),0)<=0){exit(1);}
+
 		if(send(p1, &score2, sizeof(uint8_t),0)<=0){exit(1);}
 
 		if(send(p2, &score1, sizeof(uint8_t),0)<=0){exit(1);}
+
 		if(send(p2, &score2, sizeof(uint8_t),0)<=0){exit(1);}
+
 
 		if(send(p1, &round, sizeof(uint8_t),0)<=0){exit(1);}
 		if(send(p2, &round, sizeof(uint8_t),0)<=0){exit(1);}
 
 		board = generateBoard(boardSize);//no null byte
+
+		printf("%s\n", board);
 
 		if(send(p1, board, sizeof(char)*boardSize,0)<=0){exit(1);}
 		if(send(p2, board, sizeof(char)*boardSize,0)<=0){exit(1);}
@@ -166,7 +175,11 @@ void startGameSession(int p1, int p2, uint8_t boardSize, uint8_t sec){
 void takeTurns(int p1, int p2, uint8_t* score1, uint8_t* score2, 
               char* board, uint8_t boardSize, uint8_t sec, uint8_t round){
 
-	char** usedWords;
+	char* usedWords[255];
+	for(int i=0; i<255; i++){
+		usedWords[i] = NULL;
+	}
+
 	int activePlayer = 0;
 	int inactivePlayer = 0;
 	int recvValue = 0;
@@ -175,7 +188,7 @@ void takeTurns(int p1, int p2, uint8_t* score1, uint8_t* score2,
 	uint8_t zero = 0;
 	char y = 'Y';
 	char n = 'N';
-	uint8_t wordSize = 0;
+	uint8_t wordSize = 10;
 	char word[255];
 
 	struct timeval tv;
@@ -191,10 +204,10 @@ void takeTurns(int p1, int p2, uint8_t* score1, uint8_t* score2,
 		inactivePlayer=p1;
 	}
 
+
 	while(running){
-		
-		if(send(activePlayer, &y, sizeof(char),0)<=0){exit(1);}
 		if(send(inactivePlayer, &n, sizeof(char),0)<=0){exit(1);}
+		if(send(activePlayer, &y, sizeof(char),0)<=0){exit(1);}
 
 	  	//set timer
 		setsockopt(activePlayer, SOL_SOCKET,SO_RCVTIMEO, &tv, sizeof(struct timeval));
@@ -202,22 +215,21 @@ void takeTurns(int p1, int p2, uint8_t* score1, uint8_t* score2,
 		//wait sec seconds for player to respond
 		recv(activePlayer, &wordSize, sizeof(uint8_t), MSG_WAITALL);
 		recvValue = recv(activePlayer, &word, sizeof(char)*wordSize, MSG_WAITALL);
-		
+
 		if( recvValue == -1 && errno == EAGAIN ) {
 			running = false;
 			printf("%s\n", "recv returned due to timeout!");
 		}
+		//TODO: if recvValue==0, disconnect both clients
 	
 
 		//validate
-		char* validatedWord = validateWord(&word[0], board, usedWords);
-		if(strcmp(validatedWord, "") && running){
-			
-			//TODO: add validatedWord to usedWords
-
+		bool isValidWord = true;//validateWord(wordSize, &word[0], boardSize, board, usedWords);
+		if(isValidWord && running){
 			if(send(activePlayer, &one, sizeof(uint8_t),0)<=0){exit(1);}
-			if(send(inactivePlayer, &boardSize, sizeof(uint8_t),0)<=0){exit(1);}
-			if(send(inactivePlayer, board, sizeof(char)*boardSize,0)<=0){exit(1);}
+			if(send(inactivePlayer, &wordSize, sizeof(uint8_t),0)<=0){exit(1);}
+
+			if(send(inactivePlayer, word, sizeof(char)*boardSize,0)<=0){exit(1);}
 
 			if(activePlayer==p1){ score1++; }
 			else{ score2++; } 
@@ -251,16 +263,47 @@ void takeTurns(int p1, int p2, uint8_t* score1, uint8_t* score2,
  * been used this round. Then checks that every letter in word
  * corresponds to a letter in board
  */
-char* validateWord(char* word, char board[], char** usedWords){
-	bool isValid = false;
+bool validateWord(uint8_t wordsize, char* word, uint8_t boardsize, char board[], char** usedWords){
+	//check if word is in dictionary
+	return true;
 
-	//twl06.txt
-	//do something with trie.c
+	bool isValid = true;
+	char* def; //trie definition, not used
+	printf("%d\n",wordsize);
+	if(!dictionary_lookup(word, def)){
+		isValid = false;
+	}
+	printf("LEAVING NOW");
 
-	if(isValid){return word;}
-	return "";
+	//check if all letters are in board
+	for(int i=0; i<wordsize; i++){
+		bool containsChar = false;
+		printf("Reached 3\n");
+		for(int j=0; j<boardsize; j++){
+			if(word[i] == board[j]){
+				containsChar = true;
+				break;
+			}
+		}
+		if(!containsChar) isValid = false;
+	}
+
+	if(isValid)
+		isValid = checkUsed(usedWords, word);
+
+	return isValid;
+
 }
 
+bool checkUsed(char** usedWords, char* word){
+	for(int i=0; i<sizeof(usedWords)/sizeof(char*); i++){
+		if(!strcmp(usedWords[i], word)){
+			return false;
+		}else if(usedWords[i] == NULL){
+		}
+	}
+	return true;
+}
 
 char* generateBoard(uint8_t boardSize){
 	struct timeval nanotime;

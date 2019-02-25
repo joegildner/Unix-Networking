@@ -25,6 +25,9 @@ typedef struct initClientStruct{
 //void guess(int);
 void mainGameLoop(int, char, uint8_t, uint8_t);
 initClientStruct initClient(int, char**);
+bool takeTurn(int sd);
+bool waitTurn(int sd);
+void playRound(int sd);
 
 
 /* main
@@ -32,7 +35,6 @@ initClientStruct initClient(int, char**);
 int main( int argc, char **argv) {
 
 	initClientStruct c = initClient(argc, argv);
-
 	mainGameLoop(c.init_sd, c.init_player, c.init_boardSize, c.init_sec);
 
 	close(c.init_sd);
@@ -46,29 +48,98 @@ void mainGameLoop(int sd, char pNum, uint8_t boardSize, uint8_t sec){
 	uint8_t score1;
 	uint8_t score2;
 	uint8_t round = 0;
-	char board[boardSize+1];
+	char board[boardSize];
 
-
-	int loops =0;
-	while(loops<8){
-
+	while(1){
 		if(recv(sd, &score1, sizeof(uint8_t), MSG_WAITALL)<0){exit(1);}
 		if(recv(sd, &score2, sizeof(uint8_t), MSG_WAITALL)<0){exit(1);}
 
-		printf("%d - %d\n", score1, score2);
-		/*int received = 0;*/
 
 		if(recv(sd, &round, sizeof(uint8_t), MSG_WAITALL)<0){exit(1);}
-		/*received = */recv(sd, board, sizeof(char)*boardSize, MSG_WAITALL);//<0){exit(1);}
+		if(recv(sd, board, sizeof(char)*boardSize, MSG_WAITALL)<0){exit(1);}
 
-		printf("%s\n",board);
-		//printf("%s\n",board);
+		board[boardSize] = '\0';
 
-		loops++;
+		printf("Round %d...\n",round);
+		printf("Score is %d-%d\n", score1, score2);
+		printf("Board: %s\n",board);
 
+		playRound(sd);
 	}
 
 }
+
+void playRound(int sd){
+	bool roundIsRunning = true;
+
+	while(roundIsRunning){
+		char isActive;
+		if(recv(sd, &isActive, sizeof(uint8_t), MSG_WAITALL)<0){
+			exit(1);
+		}
+		printf("%c\n", isActive);
+		if(isActive == 'Y')
+			roundIsRunning = takeTurn(sd);
+		else if(isActive == 'N')
+			roundIsRunning = waitTurn(sd);
+	}
+}
+
+
+bool takeTurn(int sd){
+
+	uint8_t isValidWord =1;
+	printf("Your turn, enter word: ");
+
+		char input[1024];
+		char word[255];
+
+		for(int i=0; i<1024; i++){
+			input[i] = '\0';
+		}
+
+		scanf("%s",input);
+
+		for(int i=0; i<255; i++){
+			word[i] = input[i];
+		}
+
+		int wordSize = strlen(word);
+
+		if(send(sd, &wordSize, sizeof(uint8_t),0)<0){exit(1);}
+		if(send(sd, word, sizeof(char)*wordSize,0)<0){exit(1);}
+		if(recv(sd, &isValidWord, sizeof(uint8_t), MSG_WAITALL)<0){exit(1);}
+
+		if(isValidWord){
+			printf("Valid word!\n");
+		}
+		else{
+			printf("Invalid word!\n");
+		}
+ 
+		return isValidWord;
+
+}
+
+bool waitTurn(int sd){
+	uint8_t wordSize;
+	char word[255];
+
+	printf("Please wait for opponent to enter word...\n");
+
+	if(recv(sd, &wordSize, sizeof(uint8_t), MSG_WAITALL)<0){exit(1);}
+	if(wordSize > 0){
+		if(recv(sd, word, sizeof(char)*wordSize, MSG_WAITALL)<0){exit(1);}
+		word[wordSize] = '\0';
+		printf("Oppenent entered \"%s\"\n",word);
+		return 1;
+	}else{
+		return 0;
+	}
+
+}
+
+
 
 
 /* play hangman
@@ -225,13 +296,13 @@ initClientStruct initClient(int argc, char** argv){
 	}
 
 	char player;
-	if(recv(sd, &player, sizeof(player), MSG_WAITALL) == -1){
+	if(recv(sd, &player, sizeof(char), MSG_WAITALL) == -1){
 		perror("recv");
 		exit(1);
 	}
 
 	uint8_t boardSize;
-	if(recv(sd, &boardSize, sizeof(boardSize), MSG_WAITALL) == -1){
+	if(recv(sd, &boardSize, sizeof(char), MSG_WAITALL) == -1){
 		perror("recv");
 		exit(1);
 	}
@@ -246,6 +317,10 @@ initClientStruct initClient(int argc, char** argv){
 												.init_player = player,
 			  						.init_boardSize = boardSize,
 									.init_sec = sec};
+
+	printf("You are Player %c...\n", player);
+	printf("Board size: %d\n", boardSize);
+	printf("Seconds per turn: %d\n", sec);
 
 	return c;
 
