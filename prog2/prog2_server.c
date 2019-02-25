@@ -140,12 +140,10 @@ void startGameSession(int p1, int p2, uint8_t boardSize, uint8_t sec){
 		round++;
 
 		if(send(p1, &score1, sizeof(uint8_t),0)<=0){exit(1);}
-
 		if(send(p1, &score2, sizeof(uint8_t),0)<=0){exit(1);}
 
-		if(send(p2, &score1, sizeof(uint8_t),0)<=0){exit(1);}
-
 		if(send(p2, &score2, sizeof(uint8_t),0)<=0){exit(1);}
+		if(send(p2, &score1, sizeof(uint8_t),0)<=0){exit(1);}
 
 
 		if(send(p1, &round, sizeof(uint8_t),0)<=0){exit(1);}
