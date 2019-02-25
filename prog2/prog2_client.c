@@ -65,7 +65,17 @@ void mainGameLoop(int sd, char pNum, uint8_t boardSize, uint8_t sec){
 		printf("Board: %s\n",board);
 
 		playRound(sd);
+
+		if(score1==3){
+			printf("Player 1 won!\n");
+			break;	
+		}				
+		if( score2==3){
+			printf("Player 1 won!\n");
+			break;
+		}
 	}
+
 
 }
 
