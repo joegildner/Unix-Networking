@@ -230,12 +230,14 @@ void takeTurns(int p1, int p2, uint8_t* score1, uint8_t* score2,
 
 
 		//validate
-		bool isValidWord = validateWord(wordSize, &word[0], boardSize, board, usedWords);
+		bool isValidWord = true;//validateWord(wordSize, &word[0], boardSize, board, usedWords);
 		if(isValidWord && running){
 			printf("%s\n", "word was just validated" );
 			if(send(activePlayer, &one, sizeof(uint8_t),0)<=0){exit(1);}
 			if(send(inactivePlayer, &wordSize, sizeof(uint8_t),0)<=0){exit(1);}
+			printf("%d\n", wordSize);
 			if(send(inactivePlayer, word, sizeof(char)*boardSize,0)<=0){exit(1);}
+			printf("%s\n", word);
 
 			if(activePlayer==p1){ score1++; }
 			else{ score2++; }
@@ -245,14 +247,11 @@ void takeTurns(int p1, int p2, uint8_t* score1, uint8_t* score2,
 			running = false;
 		}
 
-		printf("active is: %d\ninactive is: %d\n",activePlayer, inactivePlayer);
 		//switch players
 		int temp;
 		temp = activePlayer;
 		activePlayer = inactivePlayer;
 		inactivePlayer = temp;
-		printf("just switched\n");
-		printf("active is: %d\ninactive is: %d",activePlayer, inactivePlayer);
 
 	}
 
