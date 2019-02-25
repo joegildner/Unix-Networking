@@ -27,7 +27,7 @@ typedef struct node {
 	 struct node* next;
 } node;
 
-bool contains(node* head, char* thisWord);
+bool contains(node* head, char* thisWord,uint8_t);
 void push(node* head, char* word);
 void startGameSession(int p1, int p2, uint8_t boardSize, uint8_t sec);
 initServerStruct initServer(int, char**);
@@ -37,6 +37,7 @@ void takeTurns(int p1, int p2, uint8_t* score1, uint8_t* score2,
               char* board, uint8_t boardSize, uint8_t sec, uint8_t round);
 bool validateWord(uint8_t wordsize, char* word, uint8_t boardsize, char board[], node* usedWords);
 bool checkUsed(char**, char*);
+bool stringCompare(char* s1, char* s2, int wordSize);
 
 
 /* main
@@ -186,7 +187,8 @@ void takeTurns(int p1, int p2, uint8_t* score1, uint8_t* score2,
               char* board, uint8_t boardSize, uint8_t sec, uint8_t round){
 
 	node* usedWords = malloc(sizeof(node));
-	usedWords->word = ""; //needed to initialize list
+	usedWords->word = strdup("zzzz\0"); //needed to initialize list
+	usedWords->next = NULL;
 
 	int activePlayer = 0;
 	int inactivePlayer = 0;
@@ -232,17 +234,14 @@ void takeTurns(int p1, int p2, uint8_t* score1, uint8_t* score2,
 
 
 		//validate
-		bool isValidWord = true;//validateWord(wordSize, &word[0], boardSize, board, usedWords);
+		bool isValidWord = validateWord(wordSize, &word[0], boardSize, board, usedWords);
 		if(isValidWord && running){
 
 			if(send(activePlayer, &one, sizeof(uint8_t),0)<=0){exit(1);}
 			if(send(inactivePlayer, &wordSize, sizeof(uint8_t),0)<=0){exit(1);}
 			if(send(inactivePlayer, word, sizeof(char)*boardSize,0)<=0){exit(1);}
-
-			if(activePlayer==p1){ (*score1)++; }
-			else{ (*score2)++; }
 		}
-		else{	
+		else{
 			running = false;
 		}
 
@@ -276,11 +275,12 @@ bool validateWord(uint8_t wordsize, char* word, uint8_t boardsize, char board[],
 
 	//check if word is in dictionary
 	bool isValid = true;
-
-	char* def = ""; //trie definition, not used
+	printf("1\n");
+	char* def; //trie definition, not used
 	if(!dictionary_lookup(word, def)){
 		isValid = false;
 	}
+	printf("2\n");
 
 	//check if all letters are in board
 	for(int i=0; i<wordsize; i++){
@@ -293,10 +293,13 @@ bool validateWord(uint8_t wordsize, char* word, uint8_t boardsize, char board[],
 		}
 		if(!containsChar) isValid = false;
 	}
+	printf("3\n");
 
-	if(isValid) isValid = !contains(usedWords,word);
+	if(isValid) isValid = !contains(usedWords,word,wordsize);
+	printf("4\n");
 
 	if(isValid) push(usedWords,word);
+	printf("5\n");
 
 	return isValid;
 
@@ -407,12 +410,14 @@ initServerStruct initServer(int argc, char** argv){
 	return c;
 }
 
-bool contains(node* head, char* thisWord) {
+bool contains(node* head, char* thisWord, uint8_t wordSize) {
 	 bool containsWord = false;
-
 	 node* current = head;
 	 while (current != NULL) {
-			if(!strcmp(current->word,thisWord)) containsWord = true;
+		 printf("3.5\n");
+		 printf("%s\n",current->word);
+		 printf("%s\n",thisWord);
+			if(stringCompare(current->word,thisWord,wordSize)) containsWord = true;
 			current = current->next;
 	 }
 	 return containsWord;
@@ -425,6 +430,14 @@ void push(node* head, char* word) {
 	 }
 
 	 current->next = malloc(sizeof(node));
-	 current->next->word = word;
+	 current->next->word = strdup(word);
 	 current->next->next = NULL;
+}
+
+bool stringCompare(char* s1, char* s2, int wordSize){
+	for(int i=0; i<wordSize; i++){
+		if(s1[i] == '\0' || s2[i] == '\0') break;
+		if(s1[i] != s2[i]) return false;
+	}
+	return true;
 }
