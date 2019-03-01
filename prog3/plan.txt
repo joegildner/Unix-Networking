@@ -1,0 +1,5 @@
+1. In this project, as we understand it, we will be implementing a messaging server for up to 255 clients and 255 observers. In this server, whenever a client connects, they will choose a username. After that, they can send either private or public messages. Public messages get sent to all observers, but private messages will only get sent to a single observer which they are paired with. When an Observer connects they can connect to a client, specified via username, from which they will receive all private messages.
+
+2. The most challenging part, from our perspective, is going to be handling all of the edge cases. There are very specific actions that the server will need to take depending on what happens with the clients and observers. For example, we will need to determine how to send a message to every single observer instead of just one if that message happens to be a public message.
+
+3.  For this project we will draw on resources such as the textbook, the linux man pages, and stack overflow for more specific questions.
