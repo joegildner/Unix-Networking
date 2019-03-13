@@ -27,39 +27,44 @@ void chat(int sd){
 
 
 void negotiateUserName(int sd){
-	bool usernameIsGoodLength = false;
-	bool usernameIsValid = false;
+	char input[1024];
+	char username[255];
+	int usernameSize = 255;
+	char result;
+	bool isValid = false;
 
-	while(!usernameIsValid){
+	for(int i=0; i<1024; i++){
+		input[i] = '\0';
+	}
 
-		while(!usernameIsGoodLength){
-			char* username = promptUsername();
-			//if length <= 10: (ONLY CHECK LENGTH, rest is server side)
-				//usernameIsGoodLength = true;
-				//send length of username
-				//send username
-			//else prompt again
+	while(!isValid){
+		while(usernameSize > 10){
+
+			scanf("%s",input);
+
+			for(int i=0; i<255; i++){
+				username[i] = input[i];
+			}
+
+			usernameSize = strlen(username);
+
 		}
 
-		//recv Y/T/I
-		//if T or I
-			//prompt again
+		if(send(sd, &usernameSize, sizeof(uint8_t),0)<0){perror("send");exit(1);}
+		if(send(sd, &username, sizeof(char)*usernameSize,0)<0){perror("send");exit(1);}
+
+		recv(sd, &result, sizeof(char), MSG_WAITALL);
+
+		if(result=='Y'){
+			isValid = true;
+		}
 
 		//the timer may run out on the server,
 		//so if the last recv is -1, exit
 	}
-
-
-
 }
 
 
-
-char* promptUsername(){
-
-	return "flyinbrik";
-
-}
 
 
 
