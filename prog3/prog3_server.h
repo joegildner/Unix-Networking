@@ -23,17 +23,19 @@ typedef struct initServerStruct {
 	int init_obssd;
 } initServerStruct;
 
-int partsds[MAX_CLIENTS];
-int iparts = 0;
-int obssds[MAX_CLIENTS];
-int iobs = 0;
+int allParts[MAX_CLIENTS];
+int pIndex = 0;
+int allObs[MAX_CLIENTS];
+int oIndex = 0;
+char* allNames[MAX_CLIENTS];
 
 
 initServerStruct initServer(int argc, char** argv);
-
-void mainAcceptLoop(struct sockaddr_in partcad, struct sockaddr_in obscad,
-										int partsd, int obssd);
-
+void mainAcceptLoop(struct sockaddr_in partcad, struct sockaddr_in obscad, int partsd, int obssd);
 void addToChat(int sd);
 void observeChat(int sd);
 void closeSocket(int sd);
+char* negotiateUserName(int sd);
+void sendAll(char* username);
+bool nameTaken(char* username);
+bool validateName(char* username);

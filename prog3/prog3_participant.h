@@ -19,3 +19,5 @@ typedef struct initParticipantStruct{
 
 initParticipantStruct initParticipant(int argc, char** argv);
 void chat(int sd);
+void negotiateUserName(int sd);
+char* promptUsername();

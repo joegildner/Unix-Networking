@@ -18,49 +18,57 @@ int main( int argc, char **argv) {
 
 }
 
-
+/* main accept loop
+ * sets up connection parameters for any and all incoming connections.
+ * either a participant or observer can join, which are handled differently.
+ *
+ * forks, child takes care of client while parent goes back to listening for
+ * new connections
+*/
 void mainAcceptLoop(struct sockaddr_in partcad, struct sockaddr_in obscad,
 										int partsd, int obssd){
 
 	bool ispart;
-
 	fd_set rfds;
-	int retval;
-
 	socklen_t partalen = sizeof(partcad);
 	socklen_t obsalen = sizeof(obscad);
 
 	while (1) {
 
+		ispart = false;
+
 		FD_ZERO(&rfds);
 		FD_SET(partsd, &rfds);
 		FD_SET(obssd, &rfds);
 
-		ispart = false;
-
-		if ( (retval = select(FD_SETSIZE, &rfds, NULL, NULL, NULL) == -1)) {
-			fprintf(stderr, "Error: Accept failed\n");
+		if ( select(FD_SETSIZE, &rfds, NULL, NULL, NULL) == -1) {
+			fprintf(stderr, "Error: select failed\n");
 		 	exit(EXIT_FAILURE);
 		}
 
+
+
+		//if a particpant joined, set flag and add to the list of participants
 		if(FD_ISSET(partsd, &rfds)){
-			if ( (partsds[iparts]=accept(partsd, (struct sockaddr *)&partcad, &partalen)) < 0) {
+			if ( (allParts[pIndex]=accept(partsd, (struct sockaddr *)&partcad, &partalen)) < 0) {
 				fprintf(stderr, "Error: Accept failed\n");
 				exit(EXIT_FAILURE);
 			}
-			printf("part\n");
+			//DEBUG: printf("part\n");
 			ispart = true;
-			iparts++;
+			pIndex++;
+		}
+		//if an observer joined, set flag and add to the list of observers
+		else if(FD_ISSET(obssd, &rfds)){
+			if ( (allObs[oIndex]=accept(obssd, (struct sockaddr *)&obscad, &obsalen)) < 0) {
+				fprintf(stderr, "Error: Accept failed\n");
+				exit(EXIT_FAILURE);
+			}
+			//DEBUG: printf("obs\n");
+			oIndex++;
 		}
 
-		else if(FD_ISSET(obssd, &rfds)){
-			if ( (obssds[iobs]=accept(obssd, (struct sockaddr *)&obscad, &obsalen)) < 0) {
-				fprintf(stderr, "Error: Accept failed\n");
-				exit(EXIT_FAILURE);
-			}
-			printf("obs\n");
-			iobs++;
-		}
+
 
 		const pid_t cpid = fork();
 		switch(cpid) {
@@ -73,9 +81,9 @@ void mainAcceptLoop(struct sockaddr_in partcad, struct sockaddr_in obscad,
 				close(obssd);
 
 				if(ispart)
-					addToChat(partsds[iparts-1]);
+					addToChat(allParts[pIndex-1]);
 				else
-					observeChat(obssds[iobs-1]);
+					observeChat(allObs[oIndex-1]);
 
 		  	exit(0);
 		 		break;
@@ -91,20 +99,27 @@ void mainAcceptLoop(struct sockaddr_in partcad, struct sockaddr_in obscad,
 }
 
 
-
+/* add to chat
+ * for participants only!
+ * check if we've reached the max number of clients
+ * otherwise negotiate a username for this client
+ * and then tell all observers that $username has joined
+*/
 void addToChat(int sd){
 
-	if(iparts==MAX_CLIENTS){
-		char temp = 'N';
-		if(send(sd, &temp, sizeof(char),0)<0){perror("send");exit(1);}
+	char Y = 'Y';
+	char N = 'N';
+
+	if(pIndex==MAX_CLIENTS){
+		if(send(sd, &N, sizeof(char),0)<0){perror("send");exit(1);}
 		closeSocket(sd);
 		exit(0);
 	}
 
-	//send Y
+	if(send(sd, &Y, sizeof(char),0)<0){perror("send");exit(1);}
 
-	negotiateUserName(sd);
-	sendAll(char* username);
+	char* username = negotiateUserName(sd);
+	sendAll(username);
 
 }
 
@@ -112,37 +127,94 @@ void addToChat(int sd){
 /*
  *
 */
-sendAll(char* username){
+void sendAll(char* username){
 	//run through observer list and send
 }
 
 
 
-/*
- *
+/* negotiateUserName
+ * on a timer, waits for participant to send a username.
+ * sends a 'Y' if it's all good.
+ * sends a 'I' if the username is just plain invalid
+ * sends a 'T' if the name has been taken, and resets the timer
 */
-negotiateUserName(int sd){
-	//start 60 second timer
+char* negotiateUserName(int sd){
 	//if timer runs out, close sd
 
-	//recv length of username
-	//recv username
+	struct timeval tv;
+		tv.tv_sec = 60;
+		tv.tv_usec = 0;
+	char Y = 'Y';
+	char I = 'I';
+	char T = 'T';
+	uint8_t usernameSize;
+	char username[255];
 
-	if(!nameTaken()){
-		if(validateName()){
-			//send Y
+	//set the timer, receive username size and username
+	setsockopt(sd, SOL_SOCKET,SO_RCVTIMEO, &tv, sizeof(struct timeval));
+	recv(sd, &usernameSize, sizeof(uint8_t), MSG_WAITALL);
+	int recvValue = recv(sd, &username, sizeof(char)*usernameSize, MSG_WAITALL);
+
+	//if timer ran out
+	if( recvValue == -1 && errno == EAGAIN ) {
+		//running = false;
+		printf("%s\n", "recv returned due to timeout!");
+	}
+
+	username[usernameSize] = '\0';
+
+	if(!nameTaken(&username[0])){
+		if(validateName(&username[0])){
+			if(send(sd, &Y, sizeof(char),0)<0){perror("send");exit(1);}
 		}
 		else{
-			//send I
+			if(send(sd, &I, sizeof(char),0)<0){perror("send");exit(1);}
 		}
 	}
 	else{
-		//send t
-		//reset timer
+		if(send(sd, &T, sizeof(char),0)<0){perror("send");exit(1);}
+		tv.tv_sec = 60;
 	}
-	//if good, send Y
-	//if not, send T and reset timer
 }
+
+
+/* name taken?
+ * iterates through all usernames known to the server, checking if
+ * a username matches any
+*/
+bool nameTaken(char* username){
+	bool isTaken = false;
+
+	for(int i=0; i<MAX_CLIENTS; i++){
+		if(strcmp(username, allNames[i])==0){
+			isTaken = true;
+		}
+	}
+
+	return isTaken;
+}
+
+
+/* validate name
+ * validates according to these rules:
+ * The username must consist only of upper-case letters, lower-case letters,
+ * numbers and underscores.  No other symbols are allowed, nor is whitespace.
+*/
+bool validateName(char* username){
+	bool isValid = true;
+
+	//if any character falls outside of these ascii ranges, invalid
+	for(int i=0; i<strlen(username); i++){
+		if(!((username[i] >= 48 && username[i] <= 57) || //number
+				(username[i] >= 65 && username[i] <= 90)  || //capital
+				(username[i] >= 97 && username[i] <= 122) || //lower case
+				(username[i] == 95))) //underscore
+		{ isValid = false; }
+	}
+	return isValid;
+}
+
 
 
 void observeChat(int sd){
@@ -151,32 +223,33 @@ void observeChat(int sd){
 
 
 
-
-//Iterates through both the observer and participant socket arrays
-//until the desired socket descriptor is found, then removes this
-//descriptor, decrements the descriptor count, and shifts everything
-//else in the array to the left.
+/* close socket
+ * Iterates through both the observer and participant socket arrays
+ * until the desired socket descriptor is found, then removes this
+ * descriptor, decrements the descriptor count, and shifts everything
+ * else in the array to the left.
+*/
 void closeSocket(int sd){
 	int i;
 
 	for(i=0; i<MAX_CLIENTS; i++){
-		if(partsds[i] == sd){
-			iparts--;
+		if(allParts[i] == sd){
+			pIndex--;
 			break;
 		}
 	}
 	for(int j = i; j < MAX_CLIENTS; j++){
-		partsds[j] = partsds[j+1];
+		allParts[j] = allParts[j+1];
 	}
 
 	for(i=0; i<MAX_CLIENTS; i++){
-		if(obssds[i] == sd){
-			iobs--;
+		if(allObs[i] == sd){
+			oIndex--;
 			break;
 		}
 	}
 	for(int j = i; j < MAX_CLIENTS; j++){
-		obssds[j] = obssds[j+1];
+		allObs[j] = allObs[j+1];
 	}
 
 }
@@ -187,9 +260,9 @@ void closeSocket(int sd){
 
 
 /* initialize server
- * handles the many procedures of initializing our server,
- * and returns a struct of everything the main game needs to know
- * about
+ * handles the many procedures of initializing our server, for both
+ * participant and observer in-sockets.
+ * RETURN: struct containing sockaddr_in's and socket descriptors for them.
  */
 initServerStruct initServer(int argc, char** argv){
 

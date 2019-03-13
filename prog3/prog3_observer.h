@@ -19,3 +19,4 @@ typedef struct initObserverStruct{
 
 initObserverStruct initObserver(int argc, char** argv);
 void chat(int sd);
+void observe(int sd);

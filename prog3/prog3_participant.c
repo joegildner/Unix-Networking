@@ -22,7 +22,7 @@ int main( int argc, char **argv) {
 void chat(int sd){
 	//recv Y/N
 	//if yes, continue, if no, abort
-	negotiateUserName(int sd);
+	negotiateUserName(sd);
 }
 
 

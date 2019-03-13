@@ -23,6 +23,7 @@ int main( int argc, char **argv) {
 void observe(int sd){
 	//init stuff idk
 	while(1){
+		printf("meh\n");
 		//recv anything
 		//print it?
 	}
