@@ -1,6 +1,6 @@
 /* Authors: Joe Gildner, Quentin Jensen */
 
-#include "prog3_partipant.h"
+#include "prog3_participant.h"
 
 
 
@@ -8,13 +8,77 @@
  */
 int main( int argc, char **argv) {
 
-	initClientStruct c = initClient(argc, argv);
-	mainGameLoop(c.init_sd, c.init_player, c.init_boardSize, c.init_sec);
-
+	initParticipantStruct c = initParticipant(argc, argv);
+	chat(c.init_sd);
 	close(c.init_sd);
 	exit(EXIT_SUCCESS);
+}
+
+
+
+/* chat
+ *
+*/
+void chat(int sd){
+	//recv Y/N
+	//if yes, continue, if no, abort
+	negotiateUserName(int sd);
+}
+
+
+void negotiateUserName(int sd){
+	bool usernameIsGoodLength = false;
+	bool usernameIsValid = false;
+
+	while(!usernameIsValid){
+
+		while(!usernameIsGoodLength){
+			char* username = promptUsername();
+			//if length <= 10: (ONLY CHECK LENGTH, rest is server side)
+				//usernameIsGoodLength = true;
+				//send length of username
+				//send username
+			//else prompt again
+		}
+
+		//recv Y/T/I
+		//if T or I
+			//prompt again
+
+		//the timer may run out on the server,
+		//so if the last recv is -1, exit
+	}
+
+
 
 }
+
+
+
+char* promptUsername(){
+
+	return "flyinbrik";
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -81,35 +145,12 @@ initParticipantStruct initParticipant(int argc, char** argv){
 		exit(EXIT_FAILURE);
 	}
 
-	char player;
-	if(recv(sd, &player, sizeof(char), MSG_WAITALL) == -1){
-		perror("recv");
-		exit(1);
-	}
 
-	uint8_t boardSize;
-	if(recv(sd, &boardSize, sizeof(char), MSG_WAITALL) == -1){
-		perror("recv");
-		exit(1);
-	}
+	initParticipantStruct c = {
+		.init_sd = sd
+	};
 
-	uint8_t sec;
-	if(recv(sd, &sec, sizeof(sec), MSG_WAITALL) == -1){
-		perror("recv");
-		exit(1);
-	}
-
-	initClientStruct c = { 	.init_sd = sd,
-												.init_player = player,
-			  						.init_boardSize = boardSize,
-									.init_sec = sec};
-
-	printf("You are Player %c...\n", player);
-	printf("Board size: %d\n", boardSize);
-	printf("Seconds per turn: %d\n", sec);
 
 	return c;
 
 }
-
-

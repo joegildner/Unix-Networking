@@ -13,11 +13,9 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 
-typedef struct initClientStruct{
+typedef struct initParticipantStruct{
 	int init_sd;
-	char init_player;
-	uint8_t init_boardSize;
-	uint8_t init_sec;
-} initClientStruct;
+} initParticipantStruct;
 
-
+initParticipantStruct initParticipant(int argc, char** argv);
+void chat(int sd);
