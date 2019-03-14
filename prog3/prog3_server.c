@@ -118,7 +118,8 @@ void addToChat(int sd){
 
 	if(send(sd, &Y, sizeof(char),0)<0){perror("send");exit(1);}
 
-	char* username = negotiateUserName(sd);
+	char usernameBuf[MAX_CLIENTS];
+	char* username = negotiateUserName(sd, usernameBuf);
 	sendAll(username);
 
 }
@@ -130,6 +131,7 @@ void addToChat(int sd){
 void sendAll(char* username){
 	//run through observer list and send
 	printf("some guy just joined. point and laugh at: %s\n",username);
+	fflush(stdout);
 }
 
 
@@ -140,7 +142,7 @@ void sendAll(char* username){
  * sends a 'I' if the username is just plain invalid
  * sends a 'T' if the name has been taken, and resets the timer
 */
-char* negotiateUserName(int sd){
+char* negotiateUserName(int sd, char* usernameBuf){
 	//if timer runs out, close sd
 
 	struct timeval tv;
@@ -150,12 +152,11 @@ char* negotiateUserName(int sd){
 	char I = 'I';
 	char T = 'T';
 	uint8_t usernameSize;
-	char username[255];
 
 	//set the timer, receive username size and username
 	setsockopt(sd, SOL_SOCKET,SO_RCVTIMEO, &tv, sizeof(struct timeval));
 	recv(sd, &usernameSize, sizeof(uint8_t), MSG_WAITALL);
-	int recvValue = recv(sd, &username, sizeof(char)*usernameSize, MSG_WAITALL);
+	int recvValue = recv(sd, usernameBuf, sizeof(char)*usernameSize, MSG_WAITALL);
 
 	//if timer ran out
 	if( recvValue == -1 && errno == EAGAIN ) {
@@ -163,10 +164,10 @@ char* negotiateUserName(int sd){
 		printf("%s\n", "recv returned due to timeout!");
 	}
 
-	username[usernameSize] = '\0';
+	/*usernameBuf[usernameSize] = '\0';
 
-	if(!nameTaken(&username[0])){
-		if(validateName(&username[0])){
+	if(!nameTaken(&usernameBuf[0])){
+		if(validateName(&usernameBuf[0])){
 			if(send(sd, &Y, sizeof(char),0)<0){perror("send");exit(1);}
 		}
 		else{
@@ -177,6 +178,8 @@ char* negotiateUserName(int sd){
 		if(send(sd, &T, sizeof(char),0)<0){perror("send");exit(1);}
 		tv.tv_sec = 60;
 	}
+	*/
+	return &usernameBuf[0];
 }
 
 
@@ -186,12 +189,13 @@ char* negotiateUserName(int sd){
 */
 bool nameTaken(char* username){
 	bool isTaken = false;
-
+	/* DEBUG: strcmp crashes server. ugh.
 	for(int i=0; i<MAX_CLIENTS; i++){
+		printf(username, allNames[i]); fflush(stdout);
 		if(strcmp(username, allNames[i])==0){
 			isTaken = true;
 		}
-	}
+	}*/
 
 	return isTaken;
 }

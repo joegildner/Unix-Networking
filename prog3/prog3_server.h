@@ -35,7 +35,7 @@ void mainAcceptLoop(struct sockaddr_in partcad, struct sockaddr_in obscad, int p
 void addToChat(int sd);
 void observeChat(int sd);
 void closeSocket(int sd);
-char* negotiateUserName(int sd);
+char* negotiateUserName(int sd, char[]);
 void sendAll(char* username);
 bool nameTaken(char* username);
 bool validateName(char* username);
