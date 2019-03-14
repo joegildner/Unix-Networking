@@ -129,6 +129,7 @@ void addToChat(int sd){
 */
 void sendAll(char* username){
 	//run through observer list and send
+	printf("some guy just joined. point and laugh at: %s\n",username);
 }
 
 

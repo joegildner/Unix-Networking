@@ -20,8 +20,14 @@ int main( int argc, char **argv) {
  *
 */
 void chat(int sd){
-	//recv Y/N
-	//if yes, continue, if no, abort
+	char result;
+	recv(sd, &result, sizeof(char), MSG_WAITALL);
+	
+	if(result=='N'){
+		printf("The server is full, try again later\n");
+		exit(0);
+	}
+
 	negotiateUserName(sd);
 }
 
@@ -39,7 +45,8 @@ void negotiateUserName(int sd){
 
 	while(!isValid){
 		while(usernameSize > 10){
-
+			
+			printf("type a username: ");
 			scanf("%s",input);
 
 			for(int i=0; i<255; i++){
@@ -53,14 +60,18 @@ void negotiateUserName(int sd){
 		if(send(sd, &usernameSize, sizeof(uint8_t),0)<0){perror("send");exit(1);}
 		if(send(sd, &username, sizeof(char)*usernameSize,0)<0){perror("send");exit(1);}
 
-		recv(sd, &result, sizeof(char), MSG_WAITALL);
+		int recvValue = recv(sd, &result, sizeof(char), MSG_WAITALL);
+
+		//not sure if this is right
+		if(recvValue<=0){
+			printf("60 seconds is up, server has disconnected you");
+			exit(0);
+		}
 
 		if(result=='Y'){
 			isValid = true;
 		}
 
-		//the timer may run out on the server,
-		//so if the last recv is -1, exit
 	}
 }
 
