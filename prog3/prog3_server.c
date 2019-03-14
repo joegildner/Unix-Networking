@@ -50,7 +50,7 @@ void mainAcceptLoop(struct sockaddr_in partcad, struct sockaddr_in obscad,
 
 		//if a particpant joined, set flag and add to the list of participants
 		if(FD_ISSET(partsd, &rfds)){
-			if ( (allParts[pIndex]=accept(partsd, (struct sockaddr *)&partcad, &partalen)) < 0) {
+			if ( (allParts[pIndex].sd=accept(partsd, (struct sockaddr *)&partcad, &partalen)) < 0) {
 				fprintf(stderr, "Error: Accept failed\n");
 				exit(EXIT_FAILURE);
 			}
@@ -60,7 +60,7 @@ void mainAcceptLoop(struct sockaddr_in partcad, struct sockaddr_in obscad,
 		}
 		//if an observer joined, set flag and add to the list of observers
 		else if(FD_ISSET(obssd, &rfds)){
-			if ( (allObs[oIndex]=accept(obssd, (struct sockaddr *)&obscad, &obsalen)) < 0) {
+			if ((allObs[oIndex].obsSD = accept(obssd, (struct sockaddr *)&obscad, &obsalen)) < 0) {
 				fprintf(stderr, "Error: Accept failed\n");
 				exit(EXIT_FAILURE);
 			}
@@ -81,9 +81,9 @@ void mainAcceptLoop(struct sockaddr_in partcad, struct sockaddr_in obscad,
 				close(obssd);
 
 				if(ispart)
-					addToChat(allParts[pIndex-1]);
+					addParticipant(allParts[pIndex-1].sd);
 				else
-					observeChat(allObs[oIndex-1]);
+					addObserver(allObs[oIndex-1].obsSD);
 
 		  	exit(0);
 		 		break;
@@ -100,13 +100,12 @@ void mainAcceptLoop(struct sockaddr_in partcad, struct sockaddr_in obscad,
 
 
 
-/* add to chat
- * for participants only!
+/* add participant
  * check if we've reached the max number of clients
  * otherwise negotiate a username for this client
  * and then tell all observers that $username has joined
 */
-void addToChat(int sd){
+void addParticipant(int sd){
 
 	char Y = 'Y';
 	char N = 'N';
@@ -132,38 +131,90 @@ void addToChat(int sd){
 
 
 
-/* observe chat
- * for observers only!
+/* add observer
  * check if we've reached the max number of clients
  * otherwise negotiate a username for this client
  * and then tell all observers that $username has joined
 */
-void observeChat(int sd){
+void addObserver(int obsSD){
 
 	char Y = 'Y';
 	char N = 'N';
 
 	if(pIndex==MAX_CLIENTS){
-		if(send(sd, &N, sizeof(char),0)<0){perror("send");exit(1);}
-		closeSocket(sd);
+		if(send(obsSD, &N, sizeof(char),0)<0){perror("send");exit(1);}
+		closeSocket(obsSD);
 		exit(0);
 	}
 
-	if(send(sd, &Y, sizeof(char),0)<0){perror("send");exit(1);}
+	if(send(obsSD, &Y, sizeof(char),0)<0){perror("send");exit(1);}
 
 	char usernameBuf[MAX_CLIENTS];
-	char* username = negotiateUserName(sd, usernameBuf);
+	char* username = negotiateUserName(obsSD, usernameBuf);
 
-	//find a particpant username that matches and send 'Y'
-	//if participant already is associated with that username, send 'T' and reset timer
-	//if username doesn't exist, send 'N' and close(sd)
-	
-/*	
+	char result = canPairWithParticipant(obsSD, username);
+
+	if(result=='T'){
+		//reset Timer( just call negotiate in a while loop?)
+	}
+	else if(result=='N'){
+		close(obsSD);
+	}
+
+
 	char msg[25] = "A new observer has joined";
 	sendAll(msg);
-*/
-	observe(sd);
+
+	observe(obsSD);
 }
+
+
+/* can pair with participant?
+ * checks to see if an observer's username matches
+ * a participants username. if so, also checks that 
+ * that participant doesn't already have an observer.
+ * 
+ * RETURN: a letter representing what to do, based on the result
+ * of this.
+ *
+ * Y: can pair
+ * N: can't pair
+ * T: this participant already has an observer
+ */
+char canPairWithParticipant(int obsSD, char* username){
+
+	char Y = 'Y';
+	char N = 'N';
+	char T = 'T';
+
+	bool partExists = false;
+
+	for(int i=0; i<pIndex; i++){
+		if(!strcmp(username, allParts[i].name)){
+			partExists = true;
+		}
+	}
+
+	if(partExists){
+
+		for(int j=0; j<oIndex; j++){
+			if(strcmp(username, allObs[j].name)){
+				if(send(obsSD, &Y, sizeof(char),0)<0){perror("send");exit(1);}
+			}
+			else{
+				if(send(obsSD, &T, sizeof(char),0)<0){perror("send");exit(1);}
+			}
+		}
+	}
+	else{
+		if(send(obsSD, &N, sizeof(char),0)<0){perror("send");exit(1);}
+	}
+
+
+	//if username doesn't exist, send 'N' and close(sd)
+}
+
+
 
 
 
@@ -176,13 +227,13 @@ void chat(int sd, char* username){
 		//ntohs here?
 		recv(sd, &msgSize, sizeof(uint8_t), MSG_WAITALL);
 			if(msgSize>MAX_MSG_SIZE){ close(sd); exit(0);}//exit here?
-		recv(sd, msg, sizeof(char)*usernameSize, MSG_WAITALL);
+		recv(sd, msg, sizeof(char)*msgSize, MSG_WAITALL);
 			msg[msgSize] = '\0';
 
 		if(msg[0]=='@')
 			sendPrivateMsg(sd, msg);
 		else
-			sendPublicMsg(sd, msg);
+			sendPublicMsg(sd, msg, username);
 
 	}
 	
@@ -190,8 +241,10 @@ void chat(int sd, char* username){
 
 
 /* send private message
- * note - sd is the sender of the message, not the intended recipient
- * nor an observer
+ * checks if the recipient exists, then formats the message to send.
+ * sends that message to both the sender's and recipient's observer
+ *
+ * if the recipient doesn't exist, send an error message to the sender
  */
 void sendPrivateMsg(int sd, char* msg){
 	
@@ -203,25 +256,27 @@ void sendPrivateMsg(int sd, char* msg){
 		char outMsg[strlen(msg)+14];
 		
 		outMsg[0] = '>';
-		for(int i=1; i<(12-strlen(username)); i++){
+		for(int i=1; i<(12-strlen(recipient)); i++){
 			outMsg[i] = ' ';
 		}
-		j=0;
-		for(int i=12-strlen(username); i<12; i++){
+		int j=0;
+		for(int i=12-strlen(recipient); i<12; i++){
 			outMsg[i] = msg[j++];
 		}
 		outMsg[12] = ':';
 		outMsg[13] = ' ';
 	
 		uint16_t msgSize = htons(strlen(outMsg));
-	
+
 		// send to the sender's observer
-		if(send(/*sd?*/, &msgSize, sizeof(uint16_t),0)<0){perror("send");exit(1);}
-		if(send(/*sd?*/, &outMsg, sizeof(char)*msgSize,0)<0){perror("send");exit(1);}	
+		int senderOSD = getObserver(sd);	
+		if(send(senderOSD, &msgSize, sizeof(uint16_t),0)<0){perror("send");exit(1);}
+		if(send(senderOSD, &outMsg, sizeof(char)*msgSize,0)<0){perror("send");exit(1);}	
 	
 		//send to recipient's observer
-		if(send(/*sd?*/, &msgSize, sizeof(uint16_t),0)<0){perror("send");exit(1);}
-		if(send(/*sd?*/, &outMsg, sizeof(char)*msgSize,0)<0){perror("send");exit(1);}
+		int recipientOSD = getObserver(getParticipantByName(recipient));
+		if(send(recipientOSD, &msgSize, sizeof(uint16_t),0)<0){perror("send");exit(1);}
+		if(send(recipientOSD, &outMsg, sizeof(char)*msgSize,0)<0){perror("send");exit(1);}
 
 	}
 	else{
@@ -232,11 +287,45 @@ void sendPrivateMsg(int sd, char* msg){
 		uint16_t msgSize = htons(strlen(outMsg));
 
 		// send to the sender's observer
-		if(send(/*sd?*/, &msgSize, sizeof(uint16_t),0)<0){perror("send");exit(1);}
-		if(send(/*sd?*/, &outMsg, sizeof(char)*msgSize,0)<0){perror("send");exit(1);}	
+		int senderOSD = getObserver(sd);	
+		if(send(senderOSD, &msgSize, sizeof(uint16_t),0)<0){perror("send");exit(1);}
+		if(send(senderOSD, &outMsg, sizeof(char)*msgSize,0)<0){perror("send");exit(1);}	
 	
 
 	}
+}
+
+
+/* get participant by name
+ * finds a participant in the list of participant-observer pairs
+ */
+int getParticipantByName(char* name){
+	int retVal = 0;
+
+	for(int i=0; i<oIndex; i++){
+		if(!strcmp(allObs[i].name, name)){
+			retVal = allObs[i].partSD;
+		}
+	}
+
+	return retVal;
+}
+
+
+
+/* get observer
+ * finds the observer sd associated with a participant sd
+ * returns observer sd, or 0 if not found
+ */
+int getObserver(int sd){
+	int retVal = 0;	
+
+	for(int i=0; i<oIndex; i++){
+		if(allObs[i].partSD == sd){
+			retVal = allObs[i].obsSD;
+		}
+	}
+	return retVal;
 }
 
 
@@ -248,6 +337,16 @@ char* parseRecipient(char* msg){
 
 
 
+/* recipient is valid?
+ * checks that a recipient exists in allNames
+ * (possibly we need to check that the participant has an observer attached?)
+ */ 
+bool recipientIsValid(char* recipient){
+	return true;//DEBUG
+}
+
+
+
 void sendPublicMsg(int sd, char* msg, char* username){
 	char outMsg[strlen(msg)+14];
 	
@@ -255,7 +354,7 @@ void sendPublicMsg(int sd, char* msg, char* username){
 	for(int i=1; i<(12-strlen(username)); i++){
 		outMsg[i] = ' ';
 	}
-	j=0;
+	int j=0;
 	for(int i=12-strlen(username); i<12; i++){
 		outMsg[i] = msg[j++];
 	}
@@ -282,8 +381,8 @@ void sendAll(char* msg){
 
 	//DEBUG: not sure if this needs to be oIndex+1 or not
 	for(int i=0; i<oIndex; i++){
-		if(send(allObs[i], &msgSize, sizeof(uint16_t),0)<0){perror("send");exit(1);}
-		if(send(allObs[i], &msg, sizeof(char)*msgSize,0)<0){perror("send");exit(1);}
+		if(send(allObs[i].obsSD, &msgSize, sizeof(uint16_t),0)<0){perror("send");exit(1);}
+		if(send(allObs[i].obsSD, &msg, sizeof(char)*msgSize,0)<0){perror("send");exit(1);}
 	}
 }
 
@@ -341,7 +440,7 @@ char* negotiateUserName(int sd, char* usernameBuf){
 
 /* name taken?
  * iterates through all usernames known to the server, checking if
- * a username matches any
+ * a username matches any. If not, add to the list.
 */
 bool nameTaken(char* username){
 	bool isTaken = false;
@@ -389,23 +488,23 @@ void closeSocket(int sd){
 	int i;
 
 	for(i=0; i<MAX_CLIENTS; i++){
-		if(allParts[i] == sd){
+		if(allParts[i].sd == sd){
 			pIndex--;
 			break;
 		}
 	}
 	for(int j = i; j < MAX_CLIENTS; j++){
-		allParts[j] = allParts[j+1];
+		allParts[j].sd = allParts[j+1].sd;
 	}
 
 	for(i=0; i<MAX_CLIENTS; i++){
-		if(allObs[i] == sd){
+		if(allObs[i].obsSD == sd){
 			oIndex--;
 			break;
 		}
 	}
 	for(int j = i; j < MAX_CLIENTS; j++){
-		allObs[j] = allObs[j+1];
+		allObs[j].obsSD = allObs[j+1].obsSD;
 	}
 
 }
