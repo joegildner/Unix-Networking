@@ -123,7 +123,7 @@ void addParticipant(int sd){
 	
 	char msg[strlen(username)+11];
 	sprintf(msg, "%s has joined", username);
-	sendAll(username);
+	sendAll(msg);
 
 	chat(sd, username);
 
