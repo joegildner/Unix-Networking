@@ -13,11 +13,13 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 
+#define MAX_MSG_SIZE 1000
+
 typedef struct initParticipantStruct{
 	int init_sd;
 } initParticipantStruct;
 
 initParticipantStruct initParticipant(int argc, char** argv);
-void chat(int sd);
+void setup(int sd);
 void negotiateUserName(int sd);
-char* promptUsername();
+void chat(int sd);

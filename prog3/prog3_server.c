@@ -99,6 +99,7 @@ void mainAcceptLoop(struct sockaddr_in partcad, struct sockaddr_in obscad,
 }
 
 
+
 /* add to chat
  * for participants only!
  * check if we've reached the max number of clients
@@ -120,18 +121,163 @@ void addToChat(int sd){
 
 	char usernameBuf[MAX_CLIENTS];
 	char* username = negotiateUserName(sd, usernameBuf);
+	
+	char msg[strlen(username)+11];
+	sprintf(msg, "%s has joined", username);
 	sendAll(username);
+
+	chat(sd, username);
 
 }
 
 
-/*
- *
+
+/* observe chat
+ * for observers only!
+ * check if we've reached the max number of clients
+ * otherwise negotiate a username for this client
+ * and then tell all observers that $username has joined
 */
-void sendAll(char* username){
+void observeChat(int sd){
+
+	char Y = 'Y';
+	char N = 'N';
+
+	if(pIndex==MAX_CLIENTS){
+		if(send(sd, &N, sizeof(char),0)<0){perror("send");exit(1);}
+		closeSocket(sd);
+		exit(0);
+	}
+
+	if(send(sd, &Y, sizeof(char),0)<0){perror("send");exit(1);}
+
+	char usernameBuf[MAX_CLIENTS];
+	char* username = negotiateUserName(sd, usernameBuf);
+
+	//find a particpant username that matches and send 'Y'
+	//if participant already is associated with that username, send 'T' and reset timer
+	//if username doesn't exist, send 'N' and close(sd)
 	
-	char msg[strlen(username)+11];
-	sprintf(msg, "%s has joined", username);
+/*	
+	char msg[25] = "A new observer has joined";
+	sendAll(msg);
+*/
+	observe(sd);
+}
+
+
+
+void chat(int sd, char* username){
+
+	uint16_t msgSize;
+	char msg[MAX_MSG_SIZE];
+
+	while(1){
+		//ntohs here?
+		recv(sd, &msgSize, sizeof(uint8_t), MSG_WAITALL);
+			if(msgSize>MAX_MSG_SIZE){ close(sd); exit(0);}//exit here?
+		recv(sd, msg, sizeof(char)*usernameSize, MSG_WAITALL);
+			msg[msgSize] = '\0';
+
+		if(msg[0]=='@')
+			sendPrivateMsg(sd, msg);
+		else
+			sendPublicMsg(sd, msg);
+
+	}
+	
+}
+
+
+/* send private message
+ * note - sd is the sender of the message, not the intended recipient
+ * nor an observer
+ */
+void sendPrivateMsg(int sd, char* msg){
+	
+	char* recipient = parseRecipient(msg);
+
+	
+	if(recipientIsValid(recipient)){
+
+		char outMsg[strlen(msg)+14];
+		
+		outMsg[0] = '>';
+		for(int i=1; i<(12-strlen(username)); i++){
+			outMsg[i] = ' ';
+		}
+		j=0;
+		for(int i=12-strlen(username); i<12; i++){
+			outMsg[i] = msg[j++];
+		}
+		outMsg[12] = ':';
+		outMsg[13] = ' ';
+	
+		uint16_t msgSize = htons(strlen(outMsg));
+	
+		// send to the sender's observer
+		if(send(/*sd?*/, &msgSize, sizeof(uint16_t),0)<0){perror("send");exit(1);}
+		if(send(/*sd?*/, &outMsg, sizeof(char)*msgSize,0)<0){perror("send");exit(1);}	
+	
+		//send to recipient's observer
+		if(send(/*sd?*/, &msgSize, sizeof(uint16_t),0)<0){perror("send");exit(1);}
+		if(send(/*sd?*/, &outMsg, sizeof(char)*msgSize,0)<0){perror("send");exit(1);}
+
+	}
+	else{
+	
+		char outMsg[strlen(recipient)+33];  
+		sprintf(outMsg, "Warning: user %s doesn't exist...", recipient);
+
+		uint16_t msgSize = htons(strlen(outMsg));
+
+		// send to the sender's observer
+		if(send(/*sd?*/, &msgSize, sizeof(uint16_t),0)<0){perror("send");exit(1);}
+		if(send(/*sd?*/, &outMsg, sizeof(char)*msgSize,0)<0){perror("send");exit(1);}	
+	
+
+	}
+}
+
+
+
+char* parseRecipient(char* msg){
+	//DEBUG:
+	return "dad";
+}
+
+
+
+void sendPublicMsg(int sd, char* msg, char* username){
+	char outMsg[strlen(msg)+14];
+	
+	outMsg[0] = '>';
+	for(int i=1; i<(12-strlen(username)); i++){
+		outMsg[i] = ' ';
+	}
+	j=0;
+	for(int i=12-strlen(username); i<12; i++){
+		outMsg[i] = msg[j++];
+	}
+	outMsg[12] = ':';
+	outMsg[13] = ' ';
+
+	sendAll(outMsg);
+
+}
+
+
+
+void observe(int sd){
+	
+}
+
+
+
+/* send all
+ * sends all observers a generic string
+*/
+void sendAll(char* msg){
 	uint16_t msgSize = htons(strlen(msg));
 
 	//DEBUG: not sure if this needs to be oIndex+1 or not
@@ -167,7 +313,7 @@ char* negotiateUserName(int sd, char* usernameBuf){
 
 	//if timer ran out
 	if( recvValue == -1 && errno == EAGAIN ) {
-		//running = false;
+		close(sd);
 		printf("%s\n", "recv returned due to timeout!");
 	}
 
@@ -186,6 +332,9 @@ char* negotiateUserName(int sd, char* usernameBuf){
 		tv.tv_sec = 60;
 	}
 	*/
+
+	//DEBUG: just send Y's for now until stupid string manipulation gets resolved
+	if(send(sd, &Y, sizeof(char),0)<0){perror("send");exit(1);}
 	return &usernameBuf[0];
 }
 
@@ -227,11 +376,6 @@ bool validateName(char* username){
 	return isValid;
 }
 
-
-
-void observeChat(int sd){
-	printf("observer has joined\n");
-}
 
 
 

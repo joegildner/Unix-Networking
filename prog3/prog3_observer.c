@@ -9,18 +9,80 @@
 int main( int argc, char **argv) {
 
 	initObserverStruct c = initObserver(argc, argv);
-	observe(c.init_sd);
+
+	setup(c.init_sd);
+	observeString(c.init_sd);
+
 	close(c.init_sd);
 	exit(EXIT_SUCCESS);
 
 }
 
 
+/* setup
+ * sets up an account with the server
+ */
+void setup(int sd){
+	char result;
+	recv(sd, &result, sizeof(char), MSG_WAITALL);
+	
+	if(result=='N'){
+		printf("The server is full, try again later\n");
+		exit(0);
+	}
 
-/*
- *
+	negotiateUserName(sd);
+}
+
+
+void negotiateUserName(int sd){
+	char input[1024];
+	char username[255];
+	uint8_t usernameSize = 255;
+	char result;
+	bool isValid = false;
+
+	for(int i=0; i<1024; i++){
+		input[i] = '\0';
+	}
+
+	while(!isValid){
+		while(usernameSize > 10){
+			
+			printf("type a username: ");
+			scanf("%s",input);
+
+			for(int i=0; i<255; i++){
+				username[i] = input[i];
+			}
+
+			usernameSize = strlen(username);
+			if(usernameSize>10){printf("username too long, try again\n");}
+		}
+
+		if(send(sd, &usernameSize, sizeof(uint8_t),0)<0){perror("send");exit(1);}
+		if(send(sd, &username, sizeof(char)*usernameSize,0)<0){perror("send");exit(1);}
+
+		int recvValue = recv(sd, &result, sizeof(char), MSG_WAITALL);
+
+		if(recvValue<=0){
+			printf("60 seconds is up, server has disconnected you");
+			exit(0);
+		}
+
+		if(result=='Y'){
+			isValid = true;
+		}
+
+	}
+}
+
+
+/* observe string
+ * only use when expecting a string from the server
+ * receives a size and a string.
 */
-void observe(int sd){
+void observeString(int sd){
 
 	uint16_t stringSize;
 	char string[1024];
@@ -35,7 +97,6 @@ void observe(int sd){
 		recv(sd, &stringSize, sizeof(uint16_t), MSG_WAITALL);
 		recvValue = recv(sd, string, sizeof(char)*stringSize, MSG_WAITALL);
 
-		//not sure if this is right
 		if(recvValue<=0){
 			printf("The server has disconnected you\n");
 			exit(0);

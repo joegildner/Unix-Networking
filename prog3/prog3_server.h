@@ -15,6 +15,7 @@
 
 #define QLEN 6
 #define MAX_CLIENTS 255
+#define MAX_MSG_SIZE 1000
 
 typedef struct initServerStruct {
 	struct sockaddr_in init_partcad;
@@ -39,3 +40,5 @@ char* negotiateUserName(int sd, char[]);
 void sendAll(char* username);
 bool nameTaken(char* username);
 bool validateName(char* username);
+void chat(int sd);
+void observe(int sd);

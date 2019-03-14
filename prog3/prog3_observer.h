@@ -19,4 +19,6 @@ typedef struct initObserverStruct{
 
 initObserverStruct initObserver(int argc, char** argv);
 void chat(int sd);
-void observe(int sd);
+void observeString(int sd);
+void negotiateUserName(int sd);
+void setup(int sd);

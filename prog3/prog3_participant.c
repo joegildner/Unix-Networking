@@ -9,17 +9,55 @@
 int main( int argc, char **argv) {
 
 	initParticipantStruct c = initParticipant(argc, argv);
+
+	setup(c.init_sd);
 	chat(c.init_sd);
+
 	close(c.init_sd);
 	exit(EXIT_SUCCESS);
 }
 
 
-
 /* chat
+ * infinitely prompt user to input a message
+ * as long as it contains at least one non-whitespace char,
+ * the message size and the message is sent to the server
+ */
+void chat(int sd){
+
+	char msg[MAX_MSG_SIZE];
+	uint16_t msgSize = MAX_MSG_SIZE;
+
+	bool isValid = false;
+
+	while(1){
+	
+		for(int i=0; i<MAX_MSG_SIZE; i++){
+			msg[i] = '\0';
+		}
+
+		while(!isValid){
+			printf("Enter message: ");
+			scanf("%s",msg);
+
+			if(/*contains at least one non-whitespace char*/true){
+				isValid=true;
+			}
+		}
+
+		uint16_t msgSize = htons(strlen(msg));
+
+		if(send(sd, &msgSize, sizeof(uint16_t),0)<0){perror("send");exit(1);}
+		if(send(sd, &msg, sizeof(char)*msgSize,0)<0){perror("send");exit(1);}
+	}
+}
+
+
+
+/* setup
  *
 */
-void chat(int sd){
+void setup(int sd){
 	char result;
 	recv(sd, &result, sizeof(char), MSG_WAITALL);
 	
@@ -35,7 +73,7 @@ void chat(int sd){
 void negotiateUserName(int sd){
 	char input[1024];
 	char username[255];
-	int usernameSize = 255;
+	uint8_t usernameSize = 255;
 	char result;
 	bool isValid = false;
 
@@ -64,7 +102,7 @@ void negotiateUserName(int sd){
 
 		//not sure if this is right
 		if(recvValue<=0){
-			printf("60 seconds is up, server has disconnected you");
+			printf("60 seconds is up, server has disconnected you\n");
 			exit(0);
 		}
 
@@ -74,17 +112,6 @@ void negotiateUserName(int sd){
 
 	}
 }
-
-
-
-
-
-
-
-
-
-
-
 
 
 
