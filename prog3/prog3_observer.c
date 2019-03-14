@@ -21,11 +21,30 @@ int main( int argc, char **argv) {
  *
 */
 void observe(int sd){
-	//init stuff idk
+
+	uint16_t stringSize;
+	char string[1024];
+	int recvValue;
+
 	while(1){
-		printf("meh\n");
-		//recv anything
-		//print it?
+		
+		for(int i=0; i<1024; i++){
+			string[i] = '\0';
+		}
+
+		recv(sd, &stringSize, sizeof(uint16_t), MSG_WAITALL);
+		recvValue = recv(sd, string, sizeof(char)*stringSize, MSG_WAITALL);
+
+		//not sure if this is right
+		if(recvValue<=0){
+			printf("The server has disconnected you\n");
+			exit(0);
+		}
+
+		string[stringSize] = '\0';
+		
+		printf("The following string is of size: %d\n", stringSize);
+		printf("%s\n", string);
 	}
 }
 

@@ -54,7 +54,7 @@ void negotiateUserName(int sd){
 			}
 
 			usernameSize = strlen(username);
-
+			if(usernameSize>10){printf("username too long, try again\n");}
 		}
 
 		if(send(sd, &usernameSize, sizeof(uint8_t),0)<0){perror("send");exit(1);}

@@ -129,9 +129,16 @@ void addToChat(int sd){
  *
 */
 void sendAll(char* username){
-	//run through observer list and send
-	printf("some guy just joined. point and laugh at: %s\n",username);
-	fflush(stdout);
+	
+	char msg[strlen(username)+11];
+	sprintf(msg, "%s has joined", username);
+	uint16_t msgSize = htons(strlen(msg));
+
+	//DEBUG: not sure if this needs to be oIndex+1 or not
+	for(int i=0; i<oIndex; i++){
+		if(send(allObs[i], &msgSize, sizeof(uint16_t),0)<0){perror("send");exit(1);}
+		if(send(allObs[i], &msg, sizeof(char)*msgSize,0)<0){perror("send");exit(1);}
+	}
 }
 
 
@@ -223,7 +230,7 @@ bool validateName(char* username){
 
 
 void observeChat(int sd){
-	printf("eat my ass\n");
+	printf("observer has joined\n");
 }
 
 
