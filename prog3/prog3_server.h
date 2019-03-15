@@ -24,34 +24,36 @@ typedef struct initServerStruct {
 	int init_obssd;
 } initServerStruct;
 
-typedef struct pair{
-	int obsSD;
-	int partSD;
-	char* name;
-} pair;
 
 typedef struct part{
-	int sd;
-	char* name;
+	int partSD;
+	char name[11];
+	bool hasPartner;
 } part;
 
-part allParts[MAX_CLIENTS];
+typedef struct pair{
+	int obsSD;
+	part* partner;
+} pair;
+
+part* allParts[MAX_CLIENTS];
 int pIndex = 0;
-pair allObs[MAX_CLIENTS];//array of pairs of observers watching participants
+pair* allObs[MAX_CLIENTS];//array of pairs of observers watching participants
 int oIndex = 0;
 char* allNames[MAX_CLIENTS];
 
 
 initServerStruct initServer(int argc, char** argv);
 void mainAcceptLoop(struct sockaddr_in partcad, struct sockaddr_in obscad, int partsd, int obssd);
-void addParticipant(int sd);
-void addObserver(int sd);
-void closeSocket(int sd);
+void addParticipant(part* thisPart);
+void addObserver(pair* thisPair);
+void closeParticipant(part* thisPart);
+void closeObserver(pair* thisPair);
 char* negotiateUserName(int sd, char[]);
 void sendAll(char* username);
 bool nameTaken(char* username);
 bool validateName(char* username);
-void chat(int sd, char* username);
+void chat(part*);
 void observe(int sd);
 void sendPublicMsg(int sd, char* msg, char* username);
 void sendPrivateMsg(int sd, char* msg);
@@ -60,3 +62,5 @@ bool recipientIsValid(char* recipient);
 int getParticipantByName(char* name);
 int getObserver(int sd);
 char canPairWithParticipant(int obsSD, char* username);
+part* newPart();
+pair* newPair();

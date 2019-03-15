@@ -64,24 +64,28 @@ void setup(int sd){
 	if(result=='N'){
 		printf("The server is full, try again later\n");
 		exit(0);
+	}else if(result == 'Y'){
+		printf("negotiating...\n"); //DEBUG
+		negotiateUserName(sd);
 	}
-
-	negotiateUserName(sd);
 }
 
 
 void negotiateUserName(int sd){
 	char input[1024];
 	char username[255];
-	uint8_t usernameSize = 255;
+	uint8_t usernameSize;
 	char result;
 	bool isValid = false;
 
-	for(int i=0; i<1024; i++){
-		input[i] = '\0';
-	}
 
 	while(!isValid){
+		usernameSize = 255;
+		
+		for(int i=0; i<1024; i++){
+			input[i] = '\0';
+		}
+
 		while(usernameSize > 10){
 			
 			printf("type a username: ");
@@ -105,11 +109,15 @@ void negotiateUserName(int sd){
 			printf("60 seconds is up, server has disconnected you\n");
 			exit(0);
 		}
-
 		if(result=='Y'){
 			isValid = true;
 		}
-
+		else if(result == 'I'){
+			printf("invalid username, please try again\n");
+		}
+		else if(result == 'T'){
+			printf("username taken, please try again\n");
+		}
 	}
 }
 

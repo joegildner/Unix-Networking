@@ -29,24 +29,28 @@ void setup(int sd){
 	if(result=='N'){
 		printf("The server is full, try again later\n");
 		exit(0);
+	} else if(result == 'Y'){
+		printf("Negotiating...\n");
+		negotiateUserName(sd);
 	}
-
-	negotiateUserName(sd);
 }
 
 
 void negotiateUserName(int sd){
 	char input[1024];
 	char username[255];
-	uint8_t usernameSize = 255;
+	uint8_t usernameSize;
 	char result;
 	bool isValid = false;
 
-	for(int i=0; i<1024; i++){
-		input[i] = '\0';
-	}
+	
 
 	while(!isValid){
+		usernameSize = 255;
+		for(int i=0; i<1024; i++){
+			input[i] = '\0';
+		}
+
 		while(usernameSize > 10){
 			
 			printf("type a username: ");
