@@ -42,10 +42,12 @@ void mainAcceptLoop(struct sockaddr_in partcad, struct sockaddr_in obscad,
 		FD_SET(partsd, &rfds);
 		FD_SET(obssd, &rfds);
 
-		// for(int i=0; i<MAX_CLIENTS; i++){
-		// 	FD_SET(allParts->partSD, &rfds);
-		// 	FD_SET(allPairs->obsSd, &rfds);
-		// }
+		for(int i=0; i<pIndex-1; i++){
+			FD_SET(allParts[i]->partSD, &rfds);
+		}
+		for(int i=0; i<oIndex-1; i++){
+			FD_SET(allObs[i]->obsSD, &rfds);
+		}
 
 		if ( select(FD_SETSIZE, &rfds, NULL, NULL, NULL) == -1) {
 			perror("select");
@@ -59,7 +61,7 @@ void mainAcceptLoop(struct sockaddr_in partcad, struct sockaddr_in obscad,
 				fprintf(stderr, "Error: Accept failed\n");
 				exit(EXIT_FAILURE);
 			}
-			ispart = true;
+			addParticipant(allParts[pIndex]);
 			pIndex++;
 		}
 		//if an observer joined, set flag and add to the list of observers
@@ -71,30 +73,6 @@ void mainAcceptLoop(struct sockaddr_in partcad, struct sockaddr_in obscad,
 			}
 			//DEBUG: printf("obs\n");
 			oIndex++;
-		}
-
-
-
-		const pid_t cpid = fork();
-		switch(cpid) {
-
-			//error
-			case -1: {perror("fork");break;}
-
-			case 0: {
-				//close(partsd);
-				//close(obssd);
-
-				if(ispart)
-					addParticipant(allParts[pIndex-1]);
-				else
-					//addObserver(allObs[oIndex-1]);
-		 		break;
-			}
-			default: {
-				//close(sd2);
-		  	break;
-			}
 		}
 
 	}
@@ -128,7 +106,7 @@ void addParticipant(part* thisPart){
 	}
 	char* username = negotiateUserName(thisPart->partSD, usernameBuf);
 	strcpy(thisPart->name, username);
-	
+
 	char msg[strlen(username)+16];
 	sprintf(msg, "User %s has joined", username);
 	printf("%s\n", msg);
@@ -138,179 +116,181 @@ void addParticipant(part* thisPart){
 }
 
 
-// /* add observer
-//  * check if we've reached the max number of clients
-//  * otherwise negotiate a username for this client
-//  * and then tell all observers that $username has joined
-// */
-// void addObserver(pair* thisPair){
+/* add observer
+ * check if we've reached the max number of clients
+ * otherwise negotiate a username for this client
+ * and then tell all observers that $username has joined
+*/
+void addObserver(pair* thisPair){
 
-// 	char Y = 'Y';
-// 	char N = 'N';
+	char Y = 'Y';
+	char N = 'N';
 
-// 	if(pIndex==MAX_CLIENTS){
-// 		if(send(thisPair->obsSD, &N, sizeof(char),0)<0){perror("send");exit(1);}
-// 		closeObserver(thisPair);
-// 		exit(0);
-// 	}
+	if(pIndex==MAX_CLIENTS){
+		if(send(thisPair->obsSD, &N, sizeof(char),0)<0){perror("send");exit(1);}
+		closeObserver(thisPair);
+		exit(0);
+	}
 
-// 	if(send(thisPair->obsSD, &Y, sizeof(char),0)<0){perror("send");exit(1);}
+	if(send(thisPair->obsSD, &Y, sizeof(char),0)<0){perror("send");exit(1);}
 
-// 	char usernameBuf[MAX_CLIENTS];
-// 	char* username = negotiateUserName(thisPair->obsSD, usernameBuf);
+	char usernameBuf[MAX_CLIENTS];
+	char* username = negotiateUserName(thisPair->obsSD, usernameBuf);
 
-// 	char result = canPairWithParticipant(thisPair->obsSD, username);
+	char result = canPairWithParticipant(thisPair->obsSD, username);
 
-// 	if(result=='T'){
-// 		//reset Timer( just call negotiate in a while loop?)
-// 	}
-// 	else if(result=='N'){
-// 		close(thisPair->obsSD);
-// 	}else{
-// 		char msg[25] = "A new observer has joined";
-// 		sendAll(msg);
-// 		observe(thisPair->obsSD);
-// 	}
-// }
-
-
-// /* can pair with participant?
-//  * checks to see if an observer's username matches
-//  * a participants username. if so, also checks that 
-//  * that participant doesn't already have an observer.
-//  * 
-//  * RETURN: a letter representing what to do, based on the result
-//  * of this.
-//  *
-//  * Y: can pair
-//  * N: can't pair
-//  * T: this participant already has an observer
-//  */
-// char canPairWithParticipant(int obsSD, char* username){
-
-// 	char Y = 'Y';
-// 	char N = 'N';
-// 	char T = 'T';
-
-// 	if(nameTaken(username)){
-
-// 		for(int j=0; j<oIndex; j++){
-
-// 			if(strcmp(username, allObs[j].name)){
-
-// 				if(send(obsSD, &Y, sizeof(char),0)<0){perror("send");exit(1);}
-// 			}
-// 			else{
-// 				if(send(obsSD, &T, sizeof(char),0)<0){perror("send");exit(1);}
-// 			}
-// 		}
-// 	}
-// 	else{
-// 		if(send(obsSD, &N, sizeof(char),0)<0){perror("send");exit(1);}
-// 	}
+	if(result=='T'){
+		//reset Timer( just call negotiate in a while loop?)
+	}
+	else if(result=='N'){
+		close(thisPair->obsSD);
+	}else{
+		char msg[25] = "A new observer has joined";
+		sendAll(msg);
+		observe(thisPair->obsSD);
+	}
+}
 
 
-// 	//if username doesn't exist, send 'N' and close(sd)
-// }
+/* can pair with participant?
+ * checks to see if an observer's username matches
+ * a participants username. if so, also checks that
+ * that participant doesn't already have an observer.
+ *
+ * RETURN: a letter representing what to do, based on the result
+ * of this.
+ *
+ * Y: can pair
+ * N: can't pair
+ * T: this participant already has an observer
+ */
+char canPairWithParticipant(int obsSD, char* username){
 
-// void chat(part* thisPart){
+	char Y = 'Y';
+	char N = 'N';
+	char T = 'T';
 
-// 	uint16_t msgSize;
-// 	char msg[MAX_MSG_SIZE];
+	bool partIsTaken = false;
 
-// 	while(1){
-// 		//ntohs here?
-// 		recv(sd, &msgSize, sizeof(uint8_t), MSG_WAITALL);
-// 			if(msgSize>MAX_MSG_SIZE){ close(sd); exit(0);}//exit here?
-// 		recv(sd, msg, sizeof(char)*msgSize, MSG_WAITALL);
-// 			msg[msgSize] = '\0';
+	//if a participant with this name exists:
+	if(nameTaken(username)){
+		//for each observer
+		for(int i=0; i<oIndex-1; i++){
+			if(!strcmp(username, allObs[i]->partner->name)){
+				partIsTaken = true;
+			}
+		}
 
-// 		if(msg[0]=='@')
-// 			sendPrivateMsg(sd, msg);
-// 		else
-// 			sendPublicMsg(sd, msg, username);
+		if(partIsTaken){
+			if(send(obsSD, &T, sizeof(char),0)<0){perror("send");exit(1);}
+		}
+		else{
+			if(send(obsSD, &Y, sizeof(char),0)<0){perror("send");exit(1);}
+		}
+	}
+	else{
+		if(send(obsSD, &N, sizeof(char),0)<0){perror("send");exit(1);}
+	}
 
-// 	}	
-// }
+}
+
+void chat(part* thisPart){
+
+	uint16_t msgSize;
+	char msg[MAX_MSG_SIZE];
+
+	while(1){
+		//ntohs here?
+		recv(thisPart->partSD, &msgSize, sizeof(uint8_t), MSG_WAITALL);
+			if(msgSize>MAX_MSG_SIZE){ close(thisPart->partSD); exit(0);}//exit here?
+		recv(thisPart->partSD, msg, sizeof(char)*msgSize, MSG_WAITALL);
+			msg[msgSize] = '\0';
+
+		if(msg[0]=='@')
+			sendPrivateMsg(thisPart, msg);
+		else
+			sendPublicMsg(thisPart->partSD, msg, thisPart->name);
+
+	}
+}
 
 
-// /* send private message
-//  * checks if the recipient exists, then formats the message to send.
-//  * sends that message to both the sender's and recipient's observer
-//  *
-//  * if the recipient doesn't exist, send an error message to the sender
-//  */
-// void sendPrivateMsg(int sd, char* msg){
-	
-// 	char* recipient = parseRecipient(msg);
+/* send private message
+ * checks if the recipient exists, then formats the message to send.
+ * sends that message to both the sender's and recipient's observer
+ *
+ * if the recipient doesn't exist, send an error message to the sender
+ */
+void sendPrivateMsg(part* p, char* msg){
 
-	
-// 	if(recipientIsValid(recipient)){
+	char* recipient = parseRecipient(msg);
 
-// 		char outMsg[strlen(msg)+14];
-		
-// 		outMsg[0] = '>';
-// 		for(int i=1; i<(12-strlen(recipient)); i++){
-// 			outMsg[i] = ' ';
-// 		}
-// 		int j=0;
-// 		for(int i=12-strlen(recipient); i<12; i++){
-// 			outMsg[i] = msg[j++];
-// 		}
-// 		outMsg[12] = ':';
-// 		outMsg[13] = ' ';
-	
-// 		uint16_t msgSize = htons(strlen(outMsg));
 
-// 		// send to the sender's observer
-// 		int senderOSD = getObserver(sd);	
-// 		if(send(senderOSD, &msgSize, sizeof(uint16_t),0)<0){perror("send");exit(1);}
-// 		if(send(senderOSD, &outMsg, sizeof(char)*msgSize,0)<0){perror("send");exit(1);}	
-	
-// 		//send to recipient's observer
-// 		int recipientOSD = getObserver(getParticipantByName(recipient));
-// 		if(send(recipientOSD, &msgSize, sizeof(uint16_t),0)<0){perror("send");exit(1);}
-// 		if(send(recipientOSD, &outMsg, sizeof(char)*msgSize,0)<0){perror("send");exit(1);}
+	if(recipientIsValid(recipient)){
 
-// 	}
-// 	else{
-	
-// 		char outMsg[strlen(recipient)+33];  
-// 		sprintf(outMsg, "Warning: user %s doesn't exist...", recipient);
+		char outMsg[strlen(msg)+14];
 
-// 		uint16_t msgSize = htons(strlen(outMsg));
+		outMsg[0] = '>';
+		for(int i=1; i<(12-strlen(recipient)); i++){
+			outMsg[i] = ' ';
+		}
+		int j=0;
+		for(int i=12-strlen(recipient); i<12; i++){
+			outMsg[i] = msg[j++];
+		}
+		outMsg[12] = ':';
+		outMsg[13] = ' ';
 
-// 		// send to the sender's observer
-// 		int senderOSD = getObserver(sd);	
-// 		if(send(senderOSD, &msgSize, sizeof(uint16_t),0)<0){perror("send");exit(1);}
-// 		if(send(senderOSD, &outMsg, sizeof(char)*msgSize,0)<0){perror("send");exit(1);}	
-	
+		uint16_t msgSize = htons(strlen(outMsg));
 
-// 	}
-// }
+		//send to our own observer
+		if(send(p->obsSD, &msgSize, sizeof(uint16_t),0)<0){perror("send");exit(1);}
+		if(send(p->obsSD, &outMsg, sizeof(char)*msgSize,0)<0){perror("send");exit(1);}
 
-// /* get participant by name
-//  * finds a participant in the list of participant-observer pairs
-//  */
-// int getParticipantByName(char* name){
-// 	int retVal = 0;
+		//send to recipient's observer
+		part* TEMP = getParticipantByName(recipient);
+		int obs_sd = TEMP->obsSD;
+		if(send(obs_sd, &msgSize, sizeof(uint16_t),0)<0){perror("send");exit(1);}
+		if(send(obs_sd, &outMsg, sizeof(char)*msgSize,0)<0){perror("send");exit(1);}
 
-// 	for(int i=0; i<oIndex; i++){
-// 		if(!strcmp(allObs[i].name, name)){
-// 			retVal = allObs[i].partSD;
-// 		}
-// 	}
+	}
+	else{
 
-// 	return retVal;
-// }
+		char outMsg[strlen(recipient)+33];
+		sprintf(outMsg, "Warning: user %s doesn't exist...", recipient);
+
+		uint16_t msgSize = htons(strlen(outMsg));
+
+		// send to the sender's observer
+		if(send(p->obsSD, &msgSize, sizeof(uint16_t),0)<0){perror("send");exit(1);}
+		if(send(p->obsSD, &outMsg, sizeof(char)*msgSize,0)<0){perror("send");exit(1);}
+
+
+	}
+}
+
+/* get participant by name
+ * finds a participant in the list of participant-observer pairs
+ */
+part* getParticipantByName(char* name){
+	part* retVal = NULL;
+
+	for(int i=0; i<pIndex-1; i++){
+		if(!strcmp(allObs[i]->partner->name, name)){
+			retVal = allObs[i]->partner;
+		}
+	}
+
+	return retVal;
+}
 
 // /* get observer
 //  * finds the observer sd associated with a participant sd
 //  * returns observer sd, or 0 if not found
 //  */
 // int getObserver(int sd){
-// 	int retVal = 0;	
-
+// 	int retVal = 0;
+//
 // 	for(int i=0; i<oIndex; i++){
 // 		if(allObs[i].partSD == sd){
 // 			retVal = allObs[i].obsSD;
@@ -327,14 +307,14 @@ char* parseRecipient(char* msg){
 /* recipient is valid?
  * checks that a recipient exists in allNames
  * (possibly we need to check that the participant has an observer attached?)
- */ 
+ */
 bool recipientIsValid(char* recipient){
 	return true;//DEBUG
 }
 
 void sendPublicMsg(int sd, char* msg, char* username){
 	char outMsg[strlen(msg)+14];
-	
+
 	outMsg[0] = '>';
 	for(int i=1; i<(12-strlen(username)); i++){
 		outMsg[i] = ' ';
@@ -351,7 +331,7 @@ void sendPublicMsg(int sd, char* msg, char* username){
 }
 
 void observe(int sd){
-	
+
 }
 
 
@@ -418,7 +398,7 @@ char* negotiateUserName(int sd, char* usernameBuf){
 			tv.tv_sec = 60;
 		}
 	}
-	
+
 
 	//DEBUG: just send Y's for now until stupid string manipulation gets resolved
 	//if(send(sd, &Y, sizeof(char),0)<0){perror("send");exit(1);}
@@ -485,17 +465,17 @@ void closeParticipant(part* thisPart){
 		allParts[j] = allParts[j+1];
 	}
 
-	
+
 
 }
 
 void closeObserver(pair* thisPair){
-	int i; 
+	int i;
 	for(i=0; i<MAX_CLIENTS; i++){
 		if(allObs[i] == thisPair){
 
 			if(thisPair->partner != NULL) thisPair->partner->hasPartner = false;
-			
+
 			oIndex--;
 			break;
 		}

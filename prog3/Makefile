@@ -4,13 +4,13 @@ default:
 	gcc -g -o prog3_participant prog3_participant.c
 
 s:
-	./prog3_server 36799 46799
+	./prog3_server 36789 46789
 
 p:
-	./prog3_participant localhost 36799
+	./prog3_participant localhost 36789
 
 o:
-	./prog3_observer localhost 46799
+	./prog3_observer localhost 46789
 
 clean:
 	rm prog3_participant

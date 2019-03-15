@@ -27,6 +27,7 @@ typedef struct initServerStruct {
 
 typedef struct part{
 	int partSD;
+	int obsSD;
 	char name[11];
 	bool hasPartner;
 } part;
@@ -56,10 +57,10 @@ bool validateName(char* username);
 void chat(part*);
 void observe(int sd);
 void sendPublicMsg(int sd, char* msg, char* username);
-void sendPrivateMsg(int sd, char* msg);
+void sendPrivateMsg(part* p, char* msg);
 char* parseRecipient(char* msg);
 bool recipientIsValid(char* recipient);
-int getParticipantByName(char* name);
+part* getParticipantByName(char* name);
 int getObserver(int sd);
 char canPairWithParticipant(int obsSD, char* username);
 part* newPart();
