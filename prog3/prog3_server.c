@@ -16,15 +16,13 @@ int main( int argc, char **argv) {
 	close(c.init_obssd);
 	exit(EXIT_SUCCESS);
 
+
 }
 
 
 /* main accept loop
  * sets up connection parameters for any and all incoming connections.
  * either a participant or observer can join, which are handled differently.
- *
- * forks, child takes care of client while parent goes back to listening for
- * new connections
 */
 void mainAcceptLoop(struct sockaddr_in partcad, struct sockaddr_in obscad,
 										int partsd, int obssd){
@@ -35,6 +33,8 @@ void mainAcceptLoop(struct sockaddr_in partcad, struct sockaddr_in obscad,
 	socklen_t obsalen = sizeof(obscad);
 
 	while (1) {
+
+		//checkTimers();
 
 		ispart = false;
 
@@ -54,7 +54,7 @@ void mainAcceptLoop(struct sockaddr_in partcad, struct sockaddr_in obscad,
 		 	exit(EXIT_FAILURE);
 		}
 
-		//if a particpant joined, set flag and add to the list of participants
+		//if a particpant joined, add to the list of participants
 		if(FD_ISSET(partsd, &rfds)){
 			allParts[pIndex] = newPart();
 			if ( (allParts[pIndex]->partSD=accept(partsd, (struct sockaddr *)&partcad, &partalen)) < 0) {
@@ -64,7 +64,7 @@ void mainAcceptLoop(struct sockaddr_in partcad, struct sockaddr_in obscad,
 			addParticipant(allParts[pIndex]);
 			pIndex++;
 		}
-		//if an observer joined, set flag and add to the list of observers
+		//if an observer joined, and add to the list of observers
 		if(FD_ISSET(obssd, &rfds)){
 			allObs[oIndex] = newPair();
 			if ((allObs[oIndex]->obsSD = accept(obssd, (struct sockaddr *)&obscad, &obsalen)) < 0) {
@@ -92,6 +92,26 @@ void mainAcceptLoop(struct sockaddr_in partcad, struct sockaddr_in obscad,
 
 }
 
+void checkTimers(){
+	for(int i=0; i<pIndex; i++){
+		long now = clock();
+		if(allParts[i]->startTime > -1){
+			time_t secs = allParts[i]->startTime;
+			if((now - (allParts[i]->startTime))/CLOCKS_PER_SEC >= CLIENT_TIMEOUT){
+				closeParticipant(allParts[i]);
+			}
+		}
+	}
+	for(int i=0; i<oIndex; i++){
+		long now = clock();
+		if(allObs[i]->startTime > -1){
+			if((now - (allObs[i]->startTime))/CLOCKS_PER_SEC >= CLIENT_TIMEOUT){
+				closeObserver(allObs[i]);
+			}
+		}
+	}
+}
+
 
 
 /* add participant
@@ -108,9 +128,7 @@ void addParticipant(part* thisPart){
 		if(send(thisPart->partSD, &N, sizeof(char),0)<0){perror("send");exit(1);}
 		closeParticipant(thisPart);
 		exit(0);
-	}
-
-	if(send(thisPart->partSD, &Y, sizeof(char),0)<0){perror("send");exit(1);}
+	}else if(send(thisPart->partSD, &Y, sizeof(char),0)<0){perror("send");exit(1);}
 }
 
 
@@ -128,9 +146,7 @@ void addObserver(pair* thisPair){
 		if(send(thisPair->obsSD, &N, sizeof(char),0)<0){perror("send");exit(1);}
 		closeObserver(thisPair);
 		exit(0);
-	}
-
-	if(send(thisPair->obsSD, &Y, sizeof(char),0)<0){perror("send");exit(1);}
+	}else if(send(thisPair->obsSD, &Y, sizeof(char),0)<0){perror("send");exit(1);}
 }
 
 
@@ -139,7 +155,7 @@ void participantAction(part* p){
 	if(p->name[0] == '\0'){
 		participantUsername(p);
 	}else{
-		//ITS CHAT TIME
+		chat(p);
 	}
 }
 
@@ -147,7 +163,7 @@ void observerAction(pair* o){
 	if(o->partner == NULL){
 		observerUsername(o);
 	}else{
-		// dont think this should happen
+		closeObserver(o);
 	}
 }
 
@@ -168,6 +184,7 @@ void participantUsername(part* p){
 			userJoined(p);
 		}else{
 			if(send(p->partSD, &T, sizeof(char),0)<0){perror("send");exit(1);}
+			p->startTime = clock();
 		}
 	}else{
 		if(send(p->partSD, &I, sizeof(char),0)<0){perror("send");exit(1);}
@@ -193,12 +210,14 @@ void observerUsername(pair* o){
 		else if(!p->hasPartner){
 			o->partner = p;
 			p->hasPartner = true;
+			p->obsSD = o->obsSD;
 			if(send(o->obsSD, &Y, sizeof(char),0)<0){perror("send");exit(1);}
 			observerJoined(o);
 
 		}
 		else{
 			if(send(o->obsSD, &T, sizeof(char),0)<0){perror("send");exit(1);}
+			o->startTime = clock();
 		}
 	}else{
 		if(send(o->obsSD, &I, sizeof(char),0)<0){perror("send");exit(1);}
@@ -254,68 +273,44 @@ void userJoined(part* p){
 	char* username = p->name;
 	char msg[strlen(username)+16];
 	sprintf(msg, "User %s has joined", username);
-	printf("%s\n", msg);
-	//sendAll(msg);
+	//printf("%s\n", msg);
+	sendAll(msg);
 }
 
 void observerJoined(pair* o){
 	char msg[26] = "A new observer has joined";
-	printf("%s\n",msg);
-	//sendAll(msg);
+	//printf("%s\n",msg);
+	sendAll(msg);
 }
 
 
-// /* can pair with participant?
-//  * checks to see if an observer's username matches
-//  * a participants username. if so, also checks that
-//  * that participant doesn't already have an observer.
-//  *
-//  * RETURN: a letter representing what to do, based on the result
-//  * of this.
-//  *
-//  * Y: can pair
-//  * N: can't pair
-//  * T: this participant already has an observer
-//  */
-// bool canPair(char* username){
-
-// 	bool canPair = true;
-
-// 	//if a participant with this name exists:
-// 	if(nameTaken(username)){
-// 		//for each observer
-// 		for(int i=0; i<oIndex-1; i++){
-// 			//if participant is already partnered
-// 			if(!strcmp(username, allObs[i]->partner->name)){
-// 				canPair = false;
-// 			}
-// 		}
-// 	}
-// 	else{
-// 		canPair = false;
-// 	}
-
-// 	return canPair;
-// }
 
 void chat(part* thisPart){
 
 	uint16_t msgSize;
 	char msg[MAX_MSG_SIZE];
 
-	while(1){
-		//ntohs here?
-		recv(thisPart->partSD, &msgSize, sizeof(uint8_t), MSG_WAITALL);
-			if(msgSize>MAX_MSG_SIZE){ close(thisPart->partSD); exit(0);}//exit here?
-		recv(thisPart->partSD, msg, sizeof(char)*msgSize, MSG_WAITALL);
-			msg[msgSize] = '\0';
+	int recvValue = recv(thisPart->partSD, &msgSize, sizeof(uint16_t), MSG_WAITALL);
+	msgSize = ntohs(msgSize);
+	//Client disconnected!
+	if(msgSize>MAX_MSG_SIZE){
+		char* username = thisPart->name;
+		char msg[strlen(username)+16];
+		sprintf(msg, "User %s has left", username);
+		closeParticipant(thisPart);
+		sendAll(msg);
 
-		if(msg[0]=='@')
-			sendPrivateMsg(thisPart, msg);
-		else
-			sendPublicMsg(thisPart->partSD, msg, thisPart->name);
-
+		return;
 	}
+
+	recv(thisPart->partSD, msg, sizeof(char)*msgSize, MSG_WAITALL);
+		msg[msgSize] = '\0';
+
+	if(msg[0]=='@')
+		sendPrivateMsg(thisPart, msg);
+	else
+		sendPublicMsg(thisPart, msg);
+
 }
 
 
@@ -327,36 +322,48 @@ void chat(part* thisPart){
  */
 void sendPrivateMsg(part* p, char* msg){
 
-	char* recipient = parseRecipient(msg);
-
+	char buf[10];
+	char* recipient = parseRecipient(msg, buf);
+	char* senderName = p->name;
 
 	if(recipientIsValid(recipient)){
 
 		char outMsg[strlen(msg)+14];
 
 		outMsg[0] = '>';
-		for(int i=1; i<(12-strlen(recipient)); i++){
+		for(int i=1; i<(12-strlen(senderName)); i++){
 			outMsg[i] = ' ';
 		}
 		int j=0;
-		for(int i=12-strlen(recipient); i<12; i++){
-			outMsg[i] = msg[j++];
+		for(int i=12-strlen(senderName); i<12; i++){
+			outMsg[i] = senderName[j++];
 		}
 		outMsg[12] = ':';
 		outMsg[13] = ' ';
 
-		uint16_t msgSize = htons(strlen(outMsg));
+		int h=14;
+		for(int i=strlen(recipient)+2; i<strlen(msg)+1; i++){
+			outMsg[h++] = msg[i];
+		}
+
+		uint16_t nMsgSize = htons(strlen(outMsg));
+		int msgSize = strlen(outMsg);
 
 		//send to our own observer
-		if(send(p->obsSD, &msgSize, sizeof(uint16_t),0)<0){perror("send");exit(1);}
-		if(send(p->obsSD, &outMsg, sizeof(char)*msgSize,0)<0){perror("send");exit(1);}
+		if(p->obsSD > -1){
+			if(send(p->obsSD, &nMsgSize, sizeof(uint16_t),0)<0){perror("send1");exit(1);}
+			if(send(p->obsSD, &outMsg, sizeof(char)*msgSize,0)<0){perror("send2");exit(1);}
+		}
 
 		//send to recipient's observer
 		part* TEMP = getParticipantByName(recipient);
-		int obs_sd = TEMP->obsSD;
-		if(send(obs_sd, &msgSize, sizeof(uint16_t),0)<0){perror("send");exit(1);}
-		if(send(obs_sd, &outMsg, sizeof(char)*msgSize,0)<0){perror("send");exit(1);}
-
+		if(TEMP != NULL){
+			int obs_sd = TEMP->obsSD;
+			if(obs_sd > -1){
+				if(send(obs_sd, &nMsgSize, sizeof(uint16_t),0)<0){perror("send3");exit(1);}
+				if(send(obs_sd, &outMsg, sizeof(char)*msgSize,0)<0){perror("send4");exit(1);}
+			}
+		}
 	}
 	else{
 
@@ -389,24 +396,32 @@ part* getParticipantByName(char* name){
 	return retVal;
 }
 
-// /* get observer
-//  * finds the observer sd associated with a participant sd
-//  * returns observer sd, or 0 if not found
-//  */
-// int getObserver(int sd){
-// 	int retVal = 0;
-//
-// 	for(int i=0; i<oIndex; i++){
-// 		if(allObs[i].partSD == sd){
-// 			retVal = allObs[i].obsSD;
-// 		}
-// 	}
-// 	return retVal;
-// }
 
-char* parseRecipient(char* msg){
-	//DEBUG:
-	return "dad";
+/* parse recipient
+ * parses a message that begins with '@' for its
+ * recipient, which is always between the @ and a space
+ * ie: "@username message"
+ */
+char* parseRecipient(char* msg, char* buf){
+
+	int i=1;
+
+	bool currentlyParsing = true;
+	while(currentlyParsing){
+
+		if(msg[i]==' '){
+			currentlyParsing = false;
+			buf[i-1] = '\0';
+		}
+		else{
+			buf[i-1] = msg[i];
+		}
+
+		i++;
+	}
+
+	return buf;
+
 }
 
 /* recipient is valid?
@@ -417,20 +432,27 @@ bool recipientIsValid(char* recipient){
 	return true;//DEBUG
 }
 
-void sendPublicMsg(int sd, char* msg, char* username){
+void sendPublicMsg(part* p, char* msg){
+
+	char* senderName = p->name;
+
 	char outMsg[strlen(msg)+14];
 
 	outMsg[0] = '>';
-	for(int i=1; i<(12-strlen(username)); i++){
+	for(int i=1; i<(12-strlen(senderName)); i++){
 		outMsg[i] = ' ';
 	}
 	int j=0;
-	for(int i=12-strlen(username); i<12; i++){
-		outMsg[i] = msg[j++];
+	for(int i=12-strlen(senderName); i<12; i++){
+		outMsg[i] = senderName[j++];
 	}
 	outMsg[12] = ':';
 	outMsg[13] = ' ';
 
+	int h=14;
+	for(int i=0; i<strlen(msg)+1; i++){
+		outMsg[h++] = msg[i];
+	}
 	sendAll(outMsg);
 
 }
@@ -445,12 +467,13 @@ void observe(int sd){
  * sends all observers a generic string
 */
 void sendAll(char* msg){
-	uint16_t msgSize = htons(strlen(msg));
+	uint16_t nMsgSize = htons(strlen(msg));
+	int msgSize = strlen(msg);
 
 	//DEBUG: not sure if this needs to be oIndex+1 or not
 	for(int i=0; i<oIndex; i++){
-		if(send(allObs[i]->obsSD, &msgSize, sizeof(uint16_t),0)<0){perror("send");exit(1);}
-		if(send(allObs[i]->obsSD, &msg, sizeof(char)*msgSize,0)<0){perror("send");exit(1);}
+		if(send(allObs[i]->obsSD, &nMsgSize, sizeof(uint16_t),0)<0){perror("send");exit(1);}
+		if(send(allObs[i]->obsSD, msg, sizeof(char)*msgSize,0)<0){perror("send");exit(1);}
 	}
 }
 
@@ -476,7 +499,11 @@ void closeParticipant(part* thisPart){
 		allParts[j] = allParts[j+1];
 	}
 
+	pair* myObs = findObserver(thisPart);
+	if(myObs != NULL) closeObserver(myObs);
+	close(thisPart->partSD);
 
+	free(thisPart);
 
 }
 
@@ -485,7 +512,11 @@ void closeObserver(pair* thisPair){
 	for(i=0; i<MAX_CLIENTS; i++){
 		if(allObs[i] == thisPair){
 
-			if(thisPair->partner != NULL) thisPair->partner->hasPartner = false;
+			if(thisPair->partner != NULL){
+				thisPair->partner->hasPartner = false;
+				thisPair->partner->obsSD = -1;
+			}
+			close(thisPair->obsSD);
 
 			oIndex--;
 			break;
@@ -494,7 +525,17 @@ void closeObserver(pair* thisPair){
 	for(int j = i; j < MAX_CLIENTS; j++){
 		allObs[j] = allObs[j+1];
 	}
+}
 
+pair* findObserver(part* p){
+	pair* thisPair = NULL;
+
+	for(int i=0; i<oIndex; i++){
+		if(allObs[i] != NULL && allObs[i]->partner == p)
+			thisPair = allObs[i];
+	}
+
+	return thisPair;
 }
 
 pair* newPair(){
@@ -506,6 +547,7 @@ pair* newPair(){
 	}
 
 	thisPair->partner = NULL;
+	thisPair->startTime = clock();
 
 	return thisPair;
 }
@@ -522,7 +564,9 @@ part* newPart(){
 		thisPart->name[i] = '\0';
 	}
 
+	thisPart->obsSD = -1;
 	thisPart->hasPartner = false;
+	thisPart->startTime = clock();
 
 	return thisPart;
 }

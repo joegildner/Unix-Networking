@@ -12,10 +12,13 @@
 #include <signal.h>
 #include <sys/time.h>
 #include <errno.h>
+#include <time.h>
+
 
 #define QLEN 6
 #define MAX_CLIENTS 255
 #define MAX_MSG_SIZE 1000
+#define CLIENT_TIMEOUT 60
 
 typedef struct initServerStruct {
 	struct sockaddr_in init_partcad;
@@ -30,11 +33,13 @@ typedef struct part{
 	int obsSD;
 	char name[11];
 	bool hasPartner;
+	time_t startTime;
 } part;
 
 typedef struct pair{
 	int obsSD;
 	part* partner;
+	time_t startTime;
 } pair;
 
 part* allParts[MAX_CLIENTS];
@@ -56,9 +61,9 @@ bool nameTaken(char* username);
 bool validateName(int sd, char* username);
 void chat(part*);
 void observe(int sd);
-void sendPublicMsg(int sd, char* msg, char* username);
+void sendPublicMsg(part* p, char* msg);
 void sendPrivateMsg(part* p, char* msg);
-char* parseRecipient(char* msg);
+char* parseRecipient(char* msg, char* buf);
 bool recipientIsValid(char* recipient);
 part* getParticipantByName(char* name);
 int getObserver(int sd);
@@ -73,3 +78,5 @@ void participantUsername(part* p);
 void observerUsername(pair* o);
 void userJoined(part* p);
 void observerJoined(pair* o);
+pair* findObserver(part* p);
+void checkTimers();

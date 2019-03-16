@@ -28,26 +28,31 @@ void chat(int sd){
 	char msg[MAX_MSG_SIZE];
 	uint16_t msgSize = MAX_MSG_SIZE;
 
-	bool isValid = false;
+
 
 	while(1){
-	
+		bool isValid = false;
+
 		for(int i=0; i<MAX_MSG_SIZE; i++){
 			msg[i] = '\0';
 		}
 
 		while(!isValid){
 			printf("Enter message: ");
-			scanf("%s",msg);
+			fgets(msg, MAX_MSG_SIZE, stdin);
+
+			if ((strlen(msg) > 0) && (msg[strlen (msg) - 1] == '\n'))
+				msg[strlen (msg) - 1] = '\0';
 
 			if(/*contains at least one non-whitespace char*/true){
 				isValid=true;
 			}
 		}
 
-		uint16_t msgSize = htons(strlen(msg));
+		uint16_t nMsgSize = htons(strlen(msg));
+		int msgSize = strlen(msg);
 
-		if(send(sd, &msgSize, sizeof(uint16_t),0)<0){perror("send");exit(1);}
+		if(send(sd, &nMsgSize, sizeof(uint16_t),0)<0){perror("send");exit(1);}
 		if(send(sd, &msg, sizeof(char)*msgSize,0)<0){perror("send");exit(1);}
 	}
 }
@@ -60,7 +65,7 @@ void chat(int sd){
 void setup(int sd){
 	char result;
 	recv(sd, &result, sizeof(char), MSG_WAITALL);
-	
+
 	if(result=='N'){
 		printf("The server is full, try again later\n");
 		exit(0);
@@ -81,15 +86,18 @@ void negotiateUserName(int sd){
 
 	while(!isValid){
 		usernameSize = 255;
-		
+
 		for(int i=0; i<1024; i++){
 			input[i] = '\0';
 		}
 
 		while(usernameSize > 10){
-			
+
 			printf("type a username: ");
-			scanf("%s",input);
+			fgets(input, MAX_MSG_SIZE, stdin);
+
+			if ((strlen(input) > 0) && (input[strlen (input) - 1] == '\n'))
+				input[strlen (input) - 1] = '\0';
 
 			for(int i=0; i<255; i++){
 				username[i] = input[i];

@@ -11,7 +11,7 @@ int main( int argc, char **argv) {
 	initObserverStruct c = initObserver(argc, argv);
 
 	setup(c.init_sd);
-	observeString(c.init_sd);
+	observeMsg(c.init_sd);
 
 	close(c.init_sd);
 	exit(EXIT_SUCCESS);
@@ -26,7 +26,7 @@ void setup(int sd){
 	char result;
 	printf("%s\n", "Waiting for the server");
 	recv(sd, &result, sizeof(char), MSG_WAITALL);
-	
+
 	if(result=='N'){
 		printf("The server is full, try again later\n");
 		exit(0);
@@ -47,15 +47,18 @@ void negotiateUserName(int sd){
 
 	while(!isValid){
 		usernameSize = 255;
-		
+
 		for(int i=0; i<1024; i++){
 			input[i] = '\0';
 		}
 
 		while(usernameSize > 10){
-			
-			printf("Type a username: ");
-			scanf("%s",input);
+
+			printf("type a username: ");
+			fgets(input, MAX_MSG_SIZE, stdin);
+
+			if ((strlen(input) > 0) && (input[strlen (input) - 1] == '\n'))
+				input[strlen (input) - 1] = '\0';
 
 			for(int i=0; i<255; i++){
 				username[i] = input[i];
@@ -88,34 +91,34 @@ void negotiateUserName(int sd){
 }
 
 
-/* observe string
- * only use when expecting a string from the server
- * receives a size and a string.
+/* observe msg
+ * only use when expecting a msg from the server
+ * receives a size and a msg.
 */
-void observeString(int sd){
+void observeMsg(int sd){
 
-	uint16_t stringSize;
-	char string[1024];
+	uint16_t msgSize;
+	char msg[1024];
 	int recvValue;
 
 	while(1){
-		
+
 		for(int i=0; i<1024; i++){
-			string[i] = '\0';
+			msg[i] = '\0';
 		}
 
-		recv(sd, &stringSize, sizeof(uint16_t), MSG_WAITALL);
-		recvValue = recv(sd, string, sizeof(char)*stringSize, MSG_WAITALL);
+		recv(sd, &msgSize, sizeof(uint16_t), MSG_WAITALL);
+			msgSize = ntohs(msgSize);
+		recvValue = recv(sd, msg, sizeof(char)*msgSize, MSG_WAITALL);
 
 		if(recvValue<=0){
 			printf("The server has disconnected you\n");
 			exit(0);
 		}
 
-		string[stringSize] = '\0';
+		msg[msgSize] = '\0';
 		
-		printf("The following string is of size: %d\n", stringSize);
-		printf("%s\n", string);
+		printf("%s\n", msg);
 	}
 }
 
