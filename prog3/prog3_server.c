@@ -42,10 +42,10 @@ void mainAcceptLoop(struct sockaddr_in partcad, struct sockaddr_in obscad,
 		FD_SET(partsd, &rfds);
 		FD_SET(obssd, &rfds);
 
-		for(int i=0; i<pIndex-1; i++){
+		for(int i=0; i<pIndex; i++){
 			FD_SET(allParts[i]->partSD, &rfds);
 		}
-		for(int i=0; i<oIndex-1; i++){
+		for(int i=0; i<oIndex; i++){
 			FD_SET(allObs[i]->obsSD, &rfds);
 		}
 
@@ -65,14 +65,27 @@ void mainAcceptLoop(struct sockaddr_in partcad, struct sockaddr_in obscad,
 			pIndex++;
 		}
 		//if an observer joined, set flag and add to the list of observers
-		else if(FD_ISSET(obssd, &rfds)){
+		if(FD_ISSET(obssd, &rfds)){
 			allObs[oIndex] = newPair();
 			if ((allObs[oIndex]->obsSD = accept(obssd, (struct sockaddr *)&obscad, &obsalen)) < 0) {
 				fprintf(stderr, "Error: Accept failed\n");
 				exit(EXIT_FAILURE);
 			}
-			//DEBUG: printf("obs\n");
+			addObserver(allObs[oIndex]);
 			oIndex++;
+		}
+
+		for(int i=0; i<pIndex; i++){
+			if(FD_ISSET(allParts[i]->partSD, &rfds)){
+				//printf("%s%d%s\n","Participant ",i," set");
+				participantAction(allParts[i]);
+			}
+		}
+		for(int i=0; i<oIndex; i++){
+			if(FD_ISSET(allObs[i]->obsSD, &rfds)){
+				//printf("%s%d%s\n","Observer ",i," set");
+				observerAction(allObs[i]);
+			}
 		}
 
 	}
@@ -98,21 +111,6 @@ void addParticipant(part* thisPart){
 	}
 
 	if(send(thisPart->partSD, &Y, sizeof(char),0)<0){perror("send");exit(1);}
-
-	char usernameBuf[MAX_CLIENTS];
-
-	for(int i=0; i<MAX_CLIENTS; i++){
-		usernameBuf[i] = '\0';
-	}
-	char* username = negotiateUserName(thisPart->partSD, usernameBuf);
-	strcpy(thisPart->name, username);
-
-	char msg[strlen(username)+16];
-	sprintf(msg, "User %s has joined", username);
-	printf("%s\n", msg);
-	sendAll(msg);
-
-	//chat(thisPart);
 }
 
 
@@ -126,73 +124,179 @@ void addObserver(pair* thisPair){
 	char Y = 'Y';
 	char N = 'N';
 
-	if(pIndex==MAX_CLIENTS){
+	if(oIndex >= MAX_CLIENTS){
 		if(send(thisPair->obsSD, &N, sizeof(char),0)<0){perror("send");exit(1);}
 		closeObserver(thisPair);
 		exit(0);
 	}
 
 	if(send(thisPair->obsSD, &Y, sizeof(char),0)<0){perror("send");exit(1);}
-
-	char usernameBuf[MAX_CLIENTS];
-	char* username = negotiateUserName(thisPair->obsSD, usernameBuf);
-
-	char result = canPairWithParticipant(thisPair->obsSD, username);
-
-	if(result=='T'){
-		//reset Timer( just call negotiate in a while loop?)
-	}
-	else if(result=='N'){
-		close(thisPair->obsSD);
-	}else{
-		char msg[25] = "A new observer has joined";
-		sendAll(msg);
-		observe(thisPair->obsSD);
-	}
 }
 
 
-/* can pair with participant?
- * checks to see if an observer's username matches
- * a participants username. if so, also checks that
- * that participant doesn't already have an observer.
- *
- * RETURN: a letter representing what to do, based on the result
- * of this.
- *
- * Y: can pair
- * N: can't pair
- * T: this participant already has an observer
- */
-char canPairWithParticipant(int obsSD, char* username){
+void participantAction(part* p){
+	//No username yet
+	if(p->name[0] == '\0'){
+		participantUsername(p);
+	}else{
+		//ITS CHAT TIME
+	}
+}
 
+void observerAction(pair* o){
+	if(o->partner == NULL){
+		observerUsername(o);
+	}else{
+		// dont think this should happen
+	}
+}
+
+void participantUsername(part* p){
+	char usernameBuf[MAX_CLIENTS];
 	char Y = 'Y';
-	char N = 'N';
+	char I = 'I';
 	char T = 'T';
 
-	bool partIsTaken = false;
+	for(int i=0; i<MAX_CLIENTS; i++){
+		usernameBuf[i] = '\0';
+	}
 
-	//if a participant with this name exists:
-	if(nameTaken(username)){
-		//for each observer
-		for(int i=0; i<oIndex-1; i++){
-			if(!strcmp(username, allObs[i]->partner->name)){
-				partIsTaken = true;
-			}
+	if(validateName(p->partSD, usernameBuf)){
+		if(!nameTaken(usernameBuf)){
+			strcpy(p->name, usernameBuf);
+			if(send(p->partSD, &Y, sizeof(char),0)<0){perror("send");exit(1);}
+			userJoined(p);
+		}else{
+			if(send(p->partSD, &T, sizeof(char),0)<0){perror("send");exit(1);}
 		}
+	}else{
+		if(send(p->partSD, &I, sizeof(char),0)<0){perror("send");exit(1);}
+	}
+}
 
-		if(partIsTaken){
-			if(send(obsSD, &T, sizeof(char),0)<0){perror("send");exit(1);}
+void observerUsername(pair* o){
+	char usernameBuf[MAX_CLIENTS];
+	char Y = 'Y';
+	char I = 'I';
+	char T = 'T';
+
+	for(int i=0; i<MAX_CLIENTS; i++){
+		usernameBuf[i] = '\0';
+	}
+
+	if(validateName(o->obsSD, usernameBuf)){
+		part* p = getParticipantByName(usernameBuf);
+
+		if(p == NULL){
+			if(send(o->obsSD, &I, sizeof(char),0)<0){perror("send");exit(1);}
+		}
+		else if(!p->hasPartner){
+			o->partner = p;
+			p->hasPartner = true;
+			if(send(o->obsSD, &Y, sizeof(char),0)<0){perror("send");exit(1);}
+			observerJoined(o);
+
 		}
 		else{
-			if(send(obsSD, &Y, sizeof(char),0)<0){perror("send");exit(1);}
+			if(send(o->obsSD, &T, sizeof(char),0)<0){perror("send");exit(1);}
 		}
+	}else{
+		if(send(o->obsSD, &I, sizeof(char),0)<0){perror("send");exit(1);}
 	}
-	else{
-		if(send(obsSD, &N, sizeof(char),0)<0){perror("send");exit(1);}
+}
+
+/* validate name
+ * validates according to these rules:
+ * The username must consist only of upper-case letters, lower-case letters,
+ * numbers and underscores.  No other symbols are allowed, nor is whitespace.
+*/
+bool validateName(int sd, char* username){
+	uint8_t usernameSize;
+
+	recv(sd, &usernameSize, sizeof(uint8_t), MSG_WAITALL);
+	int recvValue = recv(sd, username, sizeof(char)*usernameSize, MSG_WAITALL);
+	username[usernameSize] = '\0';
+
+	bool isValid = true;
+
+	//if any character falls outside of these ascii ranges, invalid
+	for(int i=0; i<strlen(username); i++){
+		if(!((username[i] >= 48 && username[i] <= 57) || //number
+				(username[i] >= 65 && username[i] <= 90)  || //capital
+				(username[i] >= 97 && username[i] <= 122) || //lower case
+				(username[i] == 95))) //underscore
+		{ isValid = false; }
 	}
 
+	if(usernameSize > 10) isValid = false;
+
+	return isValid;
 }
+
+/* name taken?
+ * iterates through all usernames known to the server, checking if
+ * a username matches any. If not, add to the list.
+*/
+bool nameTaken(char* username){
+	bool isTaken = false;
+
+	for(int i=0; i<pIndex; i++){
+		if(allParts[i]->name != NULL){
+			if(strcmp(username, allParts[i]->name)==0){
+				isTaken = true;
+			}
+		}
+	}
+	return isTaken;
+}
+
+void userJoined(part* p){
+	char* username = p->name;
+	char msg[strlen(username)+16];
+	sprintf(msg, "User %s has joined", username);
+	printf("%s\n", msg);
+	//sendAll(msg);
+}
+
+void observerJoined(pair* o){
+	char msg[26] = "A new observer has joined";
+	printf("%s\n",msg);
+	//sendAll(msg);
+}
+
+
+// /* can pair with participant?
+//  * checks to see if an observer's username matches
+//  * a participants username. if so, also checks that
+//  * that participant doesn't already have an observer.
+//  *
+//  * RETURN: a letter representing what to do, based on the result
+//  * of this.
+//  *
+//  * Y: can pair
+//  * N: can't pair
+//  * T: this participant already has an observer
+//  */
+// bool canPair(char* username){
+
+// 	bool canPair = true;
+
+// 	//if a participant with this name exists:
+// 	if(nameTaken(username)){
+// 		//for each observer
+// 		for(int i=0; i<oIndex-1; i++){
+// 			//if participant is already partnered
+// 			if(!strcmp(username, allObs[i]->partner->name)){
+// 				canPair = false;
+// 			}
+// 		}
+// 	}
+// 	else{
+// 		canPair = false;
+// 	}
+
+// 	return canPair;
+// }
 
 void chat(part* thisPart){
 
@@ -275,9 +379,10 @@ void sendPrivateMsg(part* p, char* msg){
 part* getParticipantByName(char* name){
 	part* retVal = NULL;
 
-	for(int i=0; i<pIndex-1; i++){
-		if(!strcmp(allObs[i]->partner->name, name)){
-			retVal = allObs[i]->partner;
+	for(int i=0; i<pIndex; i++){
+		if(!strcmp(allParts[i]->name, name)){
+			retVal = allParts[i];
+			break;
 		}
 	}
 
@@ -351,100 +456,6 @@ void sendAll(char* msg){
 
 
 
-/* negotiateUserName
- * on a timer, waits for participant to send a username.
- * sends a 'Y' if it's all good.
- * sends a 'I' if the username is just plain invalid
- * sends a 'T' if the name has been taken, and resets the timer
-*/
-char* negotiateUserName(int sd, char* usernameBuf){
-	//if timer runs out, close sd
-
-	struct timeval tv;
-		tv.tv_sec = 60;
-		tv.tv_usec = 0;
-	char Y = 'Y';
-	char I = 'I';
-	char T = 'T';
-	uint8_t usernameSize;
-
-	bool validName = false;
-
-	while(!validName){
-		//set the timer, receive username size and username
-		setsockopt(sd, SOL_SOCKET,SO_RCVTIMEO, &tv, sizeof(struct timeval));
-		recv(sd, &usernameSize, sizeof(uint8_t), MSG_WAITALL);
-		int recvValue = recv(sd, usernameBuf, sizeof(char)*usernameSize, MSG_WAITALL);
-
-		usernameBuf[usernameSize] = '\0';
-
-		//if timer ran out
-		if( recvValue == -1 && errno == EAGAIN ) {
-			close(sd);
-			printf("%s\n", "recv returned due to timeout!");
-			exit(1);
-		}
-		if(!nameTaken(usernameBuf)){
-			if(validateName(usernameBuf)){
-				if(send(sd, &Y, sizeof(char),0)<0){perror("send");exit(1);}
-				validName = true;
-			}
-			else{
-				if(send(sd, &I, sizeof(char),0)<0){perror("send");exit(1);}
-			}
-		}
-		else{
-			if(send(sd, &T, sizeof(char),0)<0){perror("send");exit(1);}
-			tv.tv_sec = 60;
-		}
-	}
-
-
-	//DEBUG: just send Y's for now until stupid string manipulation gets resolved
-	//if(send(sd, &Y, sizeof(char),0)<0){perror("send");exit(1);}
-	return usernameBuf;
-}
-
-
-/* name taken?
- * iterates through all usernames known to the server, checking if
- * a username matches any. If not, add to the list.
-*/
-bool nameTaken(char* username){
-	bool isTaken = false;
-	for(int i=0; i<pIndex; i++){
-		if(allParts[i]->name != NULL){
-			printf("%s\n",allParts[i]->name);
-			if(strcmp(username, allParts[i]->name)==0){
-				isTaken = true;
-			}
-		}
-	}
-	return isTaken;
-}
-
-
-/* validate name
- * validates according to these rules:
- * The username must consist only of upper-case letters, lower-case letters,
- * numbers and underscores.  No other symbols are allowed, nor is whitespace.
-*/
-bool validateName(char* username){
-	bool isValid = true;
-
-	//if any character falls outside of these ascii ranges, invalid
-	for(int i=0; i<strlen(username); i++){
-		if(!((username[i] >= 48 && username[i] <= 57) || //number
-				(username[i] >= 65 && username[i] <= 90)  || //capital
-				(username[i] >= 97 && username[i] <= 122) || //lower case
-				(username[i] == 95))) //underscore
-		{ isValid = false; }
-	}
-	return isValid;
-}
-
-
-
 
 /* close socket
  * Iterates through both the observer and participant socket arrays
@@ -493,6 +504,8 @@ pair* newPair(){
 		perror("Malloc");
 		exit(1);
 	}
+
+	thisPair->partner = NULL;
 
 	return thisPair;
 }

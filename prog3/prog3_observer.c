@@ -24,6 +24,7 @@ int main( int argc, char **argv) {
  */
 void setup(int sd){
 	char result;
+	printf("%s\n", "Waiting for the server");
 	recv(sd, &result, sizeof(char), MSG_WAITALL);
 	
 	if(result=='N'){
@@ -43,17 +44,17 @@ void negotiateUserName(int sd){
 	char result;
 	bool isValid = false;
 
-	
 
 	while(!isValid){
 		usernameSize = 255;
+		
 		for(int i=0; i<1024; i++){
 			input[i] = '\0';
 		}
 
 		while(usernameSize > 10){
 			
-			printf("type a username: ");
+			printf("Type a username: ");
 			scanf("%s",input);
 
 			for(int i=0; i<255; i++){
@@ -61,7 +62,7 @@ void negotiateUserName(int sd){
 			}
 
 			usernameSize = strlen(username);
-			if(usernameSize>10){printf("username too long, try again\n");}
+			if(usernameSize>10){printf("Username too long, try again\n");}
 		}
 
 		if(send(sd, &usernameSize, sizeof(uint8_t),0)<0){perror("send");exit(1);}
@@ -69,15 +70,20 @@ void negotiateUserName(int sd){
 
 		int recvValue = recv(sd, &result, sizeof(char), MSG_WAITALL);
 
+		//not sure if this is right
 		if(recvValue<=0){
-			printf("60 seconds is up, server has disconnected you");
+			printf("60 seconds is up, server has disconnected you\n");
 			exit(0);
 		}
-
 		if(result=='Y'){
 			isValid = true;
 		}
-
+		else if(result == 'I'){
+			printf("Invalid username, please try again\n");
+		}
+		else if(result == 'T'){
+			printf("User already has an observer, please try again.\n");
+		}
 	}
 }
 
